@@ -75,20 +75,30 @@ async function addContactToBrevo(email: string): Promise<{ ok: true } | { ok: fa
   };
 }
 
+/**
+ * Copie locale des leads (pratique en dev / hébergement avec disque persistant).
+ * Sur Vercel et la plupart des serverless, le FS est en lecture seule : on ignore
+ * l’erreur — Brevo reste la source de vérité en prod.
+ */
 async function persistLocalCopy(email: string): Promise<boolean> {
-  await fs.mkdir(dataDir, { recursive: true });
-  const existing = await readLeads();
-  const set = new Set(
-    existing.emails.map((e) => e.trim().toLowerCase()).filter(Boolean),
-  );
-  const isNew = !set.has(email);
-  set.add(email);
-  const next: LeadsFile = {
-    emails: [...set].sort(),
-    updatedAt: new Date().toISOString(),
-  };
-  await fs.writeFile(leadsPath, JSON.stringify(next, null, 2), "utf8");
-  return isNew;
+  try {
+    await fs.mkdir(dataDir, { recursive: true });
+    const existing = await readLeads();
+    const set = new Set(
+      existing.emails.map((e) => e.trim().toLowerCase()).filter(Boolean),
+    );
+    const isNew = !set.has(email);
+    set.add(email);
+    const next: LeadsFile = {
+      emails: [...set].sort(),
+      updatedAt: new Date().toISOString(),
+    };
+    await fs.writeFile(leadsPath, JSON.stringify(next, null, 2), "utf8");
+    return isNew;
+  } catch (err) {
+    console.warn("[subscribe] Copie locale leads ignorée (FS non inscriptible ?):", err);
+    return true;
+  }
 }
 
 export async function POST(req: Request) {
