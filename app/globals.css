@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+:root {
+  --os-bg: #0a0a0a;
+  --os-elev: #111111;
+  --os-elev-2: #181818;
+  --os-line: rgba(255, 255, 255, 0.06);
+  --os-line-strong: rgba(255, 255, 255, 0.12);
+  --os-line-bright: rgba(255, 255, 255, 0.18);
+  --os-text: #e8e8e6;
+  --os-text-dim: #9a9a93;
+  --os-text-faint: #5a5a55;
+  --os-accent: #e07a5f;
+  --os-accent-hover: #ea8a72;
+  --os-accent-soft: rgba(224, 122, 95, 0.16);
+  --os-accent-line: rgba(224, 122, 95, 0.35);
+  --os-ok: #8be38b;
+  --os-ok-soft: rgba(139, 227, 139, 0.22);
+}
+
+@theme inline {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+  --color-os-bg: var(--os-bg);
+  --color-os-elev: var(--os-elev);
+  --color-os-elev-2: var(--os-elev-2);
+  --color-os-line: var(--os-line);
+  --color-os-line-strong: var(--os-line-strong);
+  --color-os-line-bright: var(--os-line-bright);
+  --color-os-text: var(--os-text);
+  --color-os-text-dim: var(--os-text-dim);
+  --color-os-text-faint: var(--os-text-faint);
+  --color-os-accent: var(--os-accent);
+  --color-os-accent-hover: var(--os-accent-hover);
+  --color-os-accent-soft: var(--os-accent-soft);
+  --color-os-accent-line: var(--os-accent-line);
+  --color-os-ok: var(--os-ok);
+  --color-os-ok-soft: var(--os-ok-soft);
+}
+
+body {
+  @apply min-h-dvh bg-os-bg text-os-text font-sans antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.bg-mesh {
+  background-image:
+    radial-gradient(circle at 50% 32%, rgba(224, 122, 95, 0.07), transparent 52%),
+    linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
+  background-size: auto, 48px 48px, 48px 48px;
+  mask-image: radial-gradient(circle at 50% 38%, black 22%, transparent 78%);
+}
+
+.vignette {
+  background: radial-gradient(
+    circle at 50% 42%,
+    transparent 36%,
+    rgba(0, 0, 0, 0.55) 100%
+  );
+}
+
+.brand-mark {
+  background: conic-gradient(
+    from 220deg,
+    var(--os-accent),
+    #c95d44 30%,
+    #2a2a2a 60%,
+    var(--os-accent) 100%
+  );
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+    0 0 12px rgba(224, 122, 95, 0.45);
+}
+
+@keyframes os-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.85);
+  }
+}
+
+.pulse-dot {
+  animation: os-pulse 1.6s ease-in-out infinite;
+}

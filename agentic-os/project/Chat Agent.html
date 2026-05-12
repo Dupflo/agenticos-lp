@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>MOS — Chat Agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="agent-os.css" />
+<style>
+  html,body{height:100%}
+  #root{display:flex;flex-direction:column;height:calc(100vh - 48px)}
+
+  /* chat header */
+  .chat-hd{height:60px;border-bottom:1px solid var(--line);display:flex;align-items:center;
+    gap:14px;padding:0 22px;background:var(--bg-elev);flex-shrink:0}
+  .chat-hd .av{width:36px;height:36px;border-radius:9px;background:var(--bg);
+    border:1px solid var(--line-strong);display:flex;align-items:center;justify-content:center;
+    font-family:'JetBrains Mono',monospace;font-weight:600;font-size:15px;color:var(--accent);
+    position:relative}
+  .chat-hd .av .live{position:absolute;bottom:-2px;right:-2px;width:9px;height:9px;border-radius:50%;
+    background:var(--ok);border:2px solid var(--bg-elev);box-shadow:0 0 6px var(--ok-soft)}
+  .chat-hd .name-row{display:flex;align-items:center;gap:8px}
+  .chat-hd h1{margin:0;font-size:15px;font-weight:600;letter-spacing:-0.005em;font-family:'JetBrains Mono',monospace}
+  .chat-hd .role{font-size:11.5px;color:var(--text-faint);margin-top:2px}
+  .chat-hd-stats{margin-left:auto;display:flex;align-items:center;gap:18px;font-size:11.5px;color:var(--text-dim)}
+  .stat-pair{display:flex;flex-direction:column;align-items:flex-end;gap:2px;line-height:1.1}
+  .stat-pair .k{font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-faint)}
+  .stat-pair .v{font-family:'JetBrains Mono',monospace;font-size:12.5px;color:var(--text);font-variant-numeric:tabular-nums}
+
+  /* main chat area */
+  .chat-body{flex:1;overflow-y:auto;padding:28px 22px 40px;
+    display:flex;flex-direction:column;gap:0;align-items:stretch}
+  .day-divider{display:flex;align-items:center;gap:12px;margin:6px auto 16px;color:var(--text-faint);
+    font-size:10.5px;letter-spacing:0.1em;text-transform:uppercase;width:100%;max-width:760px}
+  .day-divider .ln{flex:1;height:1px;background:var(--line)}
+
+  .msg-wrap{display:flex;width:100%;max-width:760px;margin:0 auto 18px}
+  .msg-wrap.user{justify-content:flex-end}
+  .msg-wrap.agent{justify-content:flex-start}
+  .msg-col{max-width:78%;display:flex;flex-direction:column;gap:5px}
+
+  .msg-meta{display:flex;align-items:center;gap:8px;font-size:10.5px;color:var(--text-faint);
+    padding:0 6px}
+  .msg-wrap.user .msg-meta{justify-content:flex-end}
+  .msg-meta .who{color:var(--text-dim);font-weight:500}
+  .msg-meta .who.user{color:var(--accent)}
+
+  .bubble{padding:11px 14px;border-radius:12px;font-size:13.5px;line-height:1.55;
+    color:var(--text);position:relative}
+  .bubble.user{background:var(--user-bubble);border:1px solid var(--user-bubble-border);
+    border-bottom-right-radius:4px}
+  .bubble.agent{background:var(--bg-elev-2);border:1px solid var(--line);
+    border-bottom-left-radius:4px}
+  .bubble p{margin:0 0 8px}
+  .bubble p:last-child{margin-bottom:0}
+  .bubble code{background:rgba(255,255,255,0.07);padding:1px 5px;border-radius:3px;
+    font-family:'JetBrains Mono',monospace;font-size:12px;color:#f0d3a8}
+  .bubble pre{background:#0a0a0a;border:1px solid var(--line);border-radius:7px;padding:11px 12px;
+    margin:8px 0;overflow-x:auto;font-family:'JetBrains Mono',monospace;font-size:11.5px;
+    line-height:1.55;color:var(--text)}
+  .bubble pre .k{color:#c89cff}
+  .bubble pre .s{color:#a4d984}
+  .bubble pre .n{color:#7ec5ff}
+  .bubble pre .c{color:var(--text-faint);font-style:italic}
+  .bubble pre .f{color:#f0d3a8}
+  .bubble ul{margin:6px 0 6px;padding-left:18px}
+  .bubble li{margin:2px 0}
+  .bubble strong{color:var(--text);font-weight:600}
+
+  /* tool call card inside a message */
+  .tool-call{margin:10px 0 6px;border:1px solid var(--line);border-radius:7px;background:var(--bg);
+    font-family:'JetBrains Mono',monospace;font-size:11.5px}
+  .tool-call .tc-hd{display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--line);
+    color:var(--text-dim)}
+  .tool-call .tc-hd .tag{color:#c89cff;font-weight:500}
+  .tool-call .tc-hd .ms{margin-left:auto;color:var(--text-faint)}
+  .tool-call .tc-body{padding:8px 10px;color:var(--text-dim);line-height:1.55;white-space:pre-wrap}
+
+  /* thinking indicator */
+  .thinking{display:flex;align-items:center;gap:10px;padding:11px 14px;background:var(--bg-elev-2);
+    border:1px solid var(--line);border-radius:12px;border-bottom-left-radius:4px;
+    font-size:12.5px;color:var(--text-dim)}
+  .thinking .dots{display:inline-flex;gap:4px}
+  .thinking .dots span{width:5px;height:5px;border-radius:50%;background:var(--accent);
+    animation:bounce 1.2s ease-in-out infinite}
+  .thinking .dots span:nth-child(2){animation-delay:.18s}
+  .thinking .dots span:nth-child(3){animation-delay:.36s}
+  @keyframes bounce{0%,100%{transform:translateY(0);opacity:.6}50%{transform:translateY(-3px);opacity:1}}
+  .thinking .step{color:var(--text-faint);font-family:'JetBrains Mono',monospace;font-size:11.5px}
+
+  /* input area */
+  .input-area{flex-shrink:0;border-top:1px solid var(--line);background:var(--bg);
+    padding:14px 22px 18px}
+  .input-wrap{max-width:760px;margin:0 auto;background:var(--bg-elev);border:1px solid var(--line-strong);
+    border-radius:14px;padding:8px 10px 10px;transition:border-color .14s ease, background .14s ease}
+  .input-wrap:focus-within{border-color:var(--accent-line);background:#0e0e0e;
+    box-shadow:0 0 0 3px var(--accent-soft)}
+  .input-row{display:flex;align-items:flex-end;gap:8px}
+  .input-row textarea{flex:1;background:transparent;border:0;outline:none;color:var(--text);
+    font-family:'Inter',sans-serif;font-size:14px;line-height:1.5;resize:none;
+    padding:6px 4px;min-height:24px;max-height:200px}
+  .input-row textarea::placeholder{color:var(--text-faint)}
+  .ic-btn{width:34px;height:34px;border:0;background:transparent;border-radius:8px;color:var(--text-dim);
+    display:flex;align-items:center;justify-content:center;cursor:default;flex-shrink:0}
+  .ic-btn:hover{background:var(--bg-elev-2);color:var(--text)}
+  .send-btn{width:34px;height:34px;border:0;background:var(--accent);border-radius:8px;
+    color:#1a0e09;display:flex;align-items:center;justify-content:center;cursor:default;
+    flex-shrink:0;transition:background .14s ease}
+  .send-btn:hover{background:var(--accent-hover)}
+  .send-btn:disabled{background:var(--bg-elev-2);color:var(--text-faint);cursor:not-allowed}
+
+  .input-footer{display:flex;align-items:center;gap:6px;margin-top:6px;padding:0 4px;
+    font-size:11px;color:var(--text-faint)}
+  .mode-tabs{display:flex;gap:2px;background:transparent;border:1px solid var(--line);border-radius:7px;
+    padding:2px}
+  .mode-tabs .mt{padding:3px 9px;border-radius:5px;font-size:11px;color:var(--text-dim);cursor:default;
+    display:flex;align-items:center;gap:5px}
+  .mode-tabs .mt:hover{color:var(--text)}
+  .mode-tabs .mt.on{background:var(--bg-elev-2);color:var(--text)}
+  .mode-tabs .mt .d{width:5px;height:5px;border-radius:50%;background:var(--text-faint)}
+  .mode-tabs .mt.on[data-m="question"] .d{background:var(--info)}
+  .mode-tabs .mt.on[data-m="mission"]  .d{background:var(--accent)}
+  .mode-tabs .mt.on[data-m="routine"]  .d{background:var(--ok)}
+  .input-footer .spacer{flex:1}
+  .input-footer .hint{display:inline-flex;align-items:center;gap:5px}
+  .input-footer .kbd{font-family:'JetBrains Mono',monospace;font-size:10px;padding:1px 5px;border-radius:3px;
+    border:1px solid var(--line-strong);color:var(--text-dim);background:rgba(255,255,255,0.03)}
+
+  /* attachments */
+  .attached{display:flex;gap:6px;padding:0 4px 6px;flex-wrap:wrap}
+  .attached .at{display:inline-flex;align-items:center;gap:6px;padding:4px 8px 4px 6px;background:var(--bg);
+    border:1px solid var(--line);border-radius:6px;font-size:11.5px;color:var(--text-dim);
+    font-family:'JetBrains Mono',monospace}
+  .attached .at .x{color:var(--text-faint);cursor:default;font-size:12px}
+  .attached .at .x:hover{color:var(--text)}
+
+</style>
+</head>
+<body>
+
+<header class="os-top">
+  <div class="os-brand">
+    <div class="os-brand-mark"></div>
+    <div><div class="os-brand-name">MOS <span class="os-brand-sub mono">0.42.1</span></div></div>
+  </div>
+  <nav class="os-tabs">
+    <a class="os-tab" href="Agent Visualizer.html"><span class="dot"></span>Mesh</a>
+    <a class="os-tab" href="Edit Agent Config.html"><span class="dot"></span>Agents</a>
+    <a class="os-tab active"><span class="dot"></span>Chat</a>
+    <a class="os-tab">Traces</a>
+    <a class="os-tab">Settings</a>
+  </nav>
+  <div class="os-top-right">
+    <span class="mono" style="color:var(--text-faint)">trace.id run_4f2a91</span>
+    <div class="os-pill"><span class="pulse"></span><span>local · airgapped</span></div>
+  </div>
+</header>
+
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef, useMemo } = React;
+
+const AGENT_REGISTRY = {
+  kernel: { glyph:"K", name:"kernel", role:"orchestrator", model:"opus" },
+  atlas:  { glyph:"A", name:"atlas",  role:"retriever",    model:"sonnet" },
+  loom:   { glyph:"L", name:"loom",   role:"reasoner",     model:"sonnet-thinking" },
+  forge:  { glyph:"F", name:"forge",  role:"executor",     model:"haiku" },
+  ledger: { glyph:"$", name:"ledger", role:"sentinel",     model:"haiku" },
+  scout:  { glyph:"S", name:"scout",  role:"retriever",    model:"haiku" },
+};
+
+const Icon = ({ k, size = 14 }) => {
+  const s = { width: size, height: size, display:"inline-block", verticalAlign:"middle" };
+  const stroke = { fill:"none", stroke:"currentColor", strokeWidth:1.5, strokeLinecap:"round", strokeLinejoin:"round" };
+  switch (k) {
+    case "edit":   return <svg style={s} viewBox="0 0 20 20" {...stroke}><path d="M13 4l3 3-9 9H4v-3l9-9z"/></svg>;
+    case "attach": return <svg style={s} viewBox="0 0 20 20" {...stroke}><path d="M14 8l-5 5a3 3 0 11-4-4l6-6a4 4 0 015 5l-7 7"/></svg>;
+    case "send":   return <svg style={s} viewBox="0 0 20 20" fill="currentColor"><path d="M3 10l14-6-5 14-3-6-6-2z"/></svg>;
+    case "arrow":  return <svg style={s} viewBox="0 0 20 20" {...stroke}><path d="M5 10h10M11 6l4 4-4 4"/></svg>;
+    case "stop":   return <svg style={s} viewBox="0 0 20 20" fill="currentColor"><rect x="5" y="5" width="10" height="10" rx="2"/></svg>;
+    case "search": return <svg style={s} viewBox="0 0 20 20" {...stroke}><circle cx="9" cy="9" r="5.5"/><path d="M13 13l3.5 3.5"/></svg>;
+    case "term":   return <svg style={s} viewBox="0 0 20 20" {...stroke}><rect x="2.5" y="4" width="15" height="12" rx="1.5"/><path d="M5 8l2.5 2L5 12M10 13h4"/></svg>;
+    case "doc":    return <svg style={s} viewBox="0 0 20 20" {...stroke}><path d="M5 2.5h7l4 4V17a.5.5 0 01-.5.5h-11A.5.5 0 014 17V3a.5.5 0 01.5-.5z"/><path d="M12 2.5V6h4"/></svg>;
+  }
+  return null;
+};
+
+// ─────── seed conversation ───────
+const seedMessages = (agentId) => {
+  if (agentId === "forge") return [
+    { id:1, who:"user", time:"14:08", text:"On va corriger le bug d'auth sur /api/login. Refresh-token revient parfois `null` après expiration." },
+    { id:2, who:"agent", time:"14:08", blocks:[
+      { type:"p", text:"Reçu. Je commence par lire la route et le middleware avant de proposer un diff." },
+      { type:"tool", name:"fs.read", args:"src/api/login.ts, src/middleware/refresh.ts", ms:42 },
+      { type:"p", text:"Le souci vient du `await refresh()` qui peut renvoyer `null` quand le cookie est expiré côté client — on ne le ré-essaie pas." },
+      { type:"p", text:"Voici le patch minimal :" },
+      { type:"code", lang:"ts",
+        code: `<span class="c">// src/middleware/refresh.ts</span>
+export <span class="k">async function</span> <span class="f">refresh</span>(req: Request) {
+  <span class="k">const</span> token = req.cookies.get(<span class="s">"rt"</span>);
+  <span class="k">if</span> (!token) <span class="k">return null</span>;
+
+  <span class="k">try</span> {
+    <span class="k">return await</span> rotateRefreshToken(token);
+  } <span class="k">catch</span> (e) {
+    <span class="k">if</span> (e.code === <span class="s">"EXPIRED"</span>) {
+      <span class="c">// 🆕 retry once with the legacy cookie before giving up</span>
+      <span class="k">const</span> legacy = req.cookies.get(<span class="s">"rt.legacy"</span>);
+      <span class="k">if</span> (legacy) <span class="k">return</span> rotateRefreshToken(legacy);
+    }
+    <span class="k">throw</span> e;
+  }
+}` },
+      { type:"p", text:"Je lance la suite de tests `pkg/auth` après application :" },
+      { type:"tool", name:"shell", args:"pnpm test --filter pkg/auth", ms:1840 },
+      { type:"p", text:"✅ **142/210** passing. Les 68 restants n'étaient pas liés au refresh — déjà rouges avant le patch. Tu veux que je crée un commit `fix(auth): retry refresh with legacy cookie` ?" },
+    ]},
+    { id:3, who:"user", time:"14:11", text:"Oui, commit + push sur la branche `auth-refresh-fix`. Et ouvre une PR avec un résumé." },
+    { id:4, who:"agent", time:"14:12", blocks:[
+      { type:"p", text:"Parfait. Avant de pousser je vérifie les permissions :" },
+      { type:"tool", name:"policy.check", args:"git.push origin auth-refresh-fix", ms:8 },
+      { type:"p", text:"Approuvé par `warden`. Je continue." },
+      { type:"tool", name:"shell", args:"git add -p && git commit -m 'fix(auth): retry refresh with legacy cookie' && git push origin auth-refresh-fix", ms:980 },
+      { type:"p", text:"PR ouverte : **acme/billing#4117** — j'y ai posé le résumé suivant :" },
+      { type:"ul", items:[
+        "Root cause: `refresh()` returned `null` silently when the rotation throws EXPIRED.",
+        "Fix: fall back to `rt.legacy` cookie once before propagating the error.",
+        "Tests: pkg/auth 142/210 passing (parity with main).",
+        "Risk: low — guarded by a single `try/catch`, fully covered by `refresh.spec.ts`."
+      ]},
+      { type:"p", text:"Je préviens `kernel` que la mission est terminée et j'archive la trace." },
+    ]},
+  ];
+  if (agentId === "loom") return [
+    { id:1, who:"user", time:"14:14", text:"Résume-moi les notes de la réunion d'hier en 4 bullets max. Ton de voix : direct, factuel." },
+    { id:2, who:"agent", time:"14:14", blocks:[
+      { type:"tool", name:"search.local", args:"queries=[\"meeting 2026-05-10\"]", ms:120 },
+      { type:"p", text:"Trouvé 1 transcript (`~/notes/2026-05-10-acme-sync.md`). Synthèse :" },
+      { type:"ul", items:[
+        "**Decision** — on garde Postgres ; pas de migration vers Planetscale ce trimestre.",
+        "**Action** — Marc livre la maquette du nouveau onboarding mardi.",
+        "**Risque** — la latence p95 a doublé sur EU-west, à investiguer avant fin de semaine.",
+        "**Suivi** — re-sync prévu jeudi 10:00, focus billing v2."
+      ]},
+    ]},
+  ];
+  return [
+    { id:1, who:"user", time:"14:00", text:"Bonjour. Quel est l'état de la mesh ce matin ?" },
+    { id:2, who:"agent", time:"14:00", blocks:[
+      { type:"p", text:"Bonjour. **8 agents actifs** sur 12. Résumé :" },
+      { type:"ul", items:[
+        "`atlas` crawle l'index — shard 3/8.",
+        "`loom` synthétise la réponse en cours (12 sources).",
+        "`harbor` a hit un 429 sur api.notion.com — backoff 28s en cours.",
+        "Budget : 41% du cap horaire utilisé (`$10.32 / $25`)."
+      ]},
+      { type:"p", text:"Tu veux que je te route une mission ?" },
+    ]},
+  ];
+};
+
+// ─────── components ───────
+function Bubble({ m }) {
+  if (m.who === "user") {
+    return (
+      <div className="msg-wrap user">
+        <div className="msg-col">
+          <div className="bubble user">{m.text}</div>
+          <div className="msg-meta"><span className="time mono">{m.time}</span><span className="who user">you</span></div>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="msg-wrap agent">
+      <div className="msg-col">
+        <div className="bubble agent">
+          {m.blocks.map((b, i) => {
+            if (b.type === "p")    return <p key={i} dangerouslySetInnerHTML={{__html: b.text.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/`([^`]+?)`/g, "<code>$1</code>")}} />;
+            if (b.type === "ul")   return <ul key={i}>{b.items.map((it,j) =>
+              <li key={j} dangerouslySetInnerHTML={{__html: it.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/`([^`]+?)`/g, "<code>$1</code>")}} />)}</ul>;
+            if (b.type === "code") return <pre key={i} dangerouslySetInnerHTML={{__html: b.code}} />;
+            if (b.type === "tool") return (
+              <div key={i} className="tool-call">
+                <div className="tc-hd">
+                  <Icon k={b.name === "shell" ? "term" : b.name.startsWith("fs") ? "doc" : "search"} size={12}/>
+                  <span className="tag">{b.name}</span>
+                  <span className="ms">{b.ms}ms</span>
+                </div>
+                <div className="tc-body">{b.args}</div>
+              </div>
+            );
+            return null;
+          })}
+        </div>
+        <div className="msg-meta">
+          <span className="who">agent</span><span className="time mono">·  {m.time}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Thinking({ step }) {
+  return (
+    <div className="msg-wrap agent">
+      <div className="msg-col">
+        <div className="thinking">
+          <span className="dots"><span></span><span></span><span></span></span>
+          <span>agent thinking</span>
+          <span className="step">— {step}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  // pick agent from query string (?agent=forge), default forge
+  const initial = (() => {
+    const m = window.location.search.match(/agent=(\w+)/);
+    const id = m ? m[1] : "forge";
+    return AGENT_REGISTRY[id] ? id : "forge";
+  })();
+  const [agentId, setAgentId] = useState(initial);
+  const agent = AGENT_REGISTRY[agentId];
+
+  const [messages, setMessages] = useState(() => seedMessages(initial));
+  const [draft, setDraft] = useState("");
+  const [mode, setMode] = useState("question");
+  const [thinking, setThinking] = useState(null);
+  const [attachments, setAttachments] = useState([]);
+
+  const bodyRef = useRef(null);
+  const taRef = useRef(null);
+
+  useEffect(() => {
+    if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
+  }, [messages, thinking]);
+
+  // auto-resize textarea
+  useEffect(() => {
+    if (!taRef.current) return;
+    taRef.current.style.height = "auto";
+    taRef.current.style.height = Math.min(200, taRef.current.scrollHeight) + "px";
+  }, [draft]);
+
+  const send = () => {
+    if (!draft.trim() && attachments.length === 0) return;
+    const now = new Date();
+    const time = now.toTimeString().slice(0,5);
+    const text = draft.trim();
+    setMessages(m => [...m, { id: Date.now(), who:"user", time, text }]);
+    setDraft("");
+    setAttachments([]);
+
+    // simulate thinking + canned reply
+    const steps = ["routing intent", "loading context", "drafting response"];
+    let i = 0;
+    setThinking(steps[0]);
+    const next = () => {
+      i++;
+      if (i < steps.length) {
+        setThinking(steps[i]);
+        setTimeout(next, 900 + Math.random()*500);
+      } else {
+        setThinking(null);
+        const reply = {
+          id: Date.now()+1, who:"agent", time: new Date().toTimeString().slice(0,5),
+          blocks: [
+            { type:"p", text: mode === "mission"
+                ? "Mission acceptée. Je décompose en étapes et te tiens au courant via Telegram dès que la première est livrée."
+                : mode === "routine"
+                ? "Routine planifiée. Je l'exécute toutes les 15 min et n'écris ici qu'en cas d'anomalie."
+                : "Compris. Voici une réponse rapide — dis-moi si tu veux que j'aille plus loin." },
+            ...(mode === "mission" ? [{ type:"ul", items:[
+              "Plan posé dans `~/.mos/missions/" + Date.now().toString(36) + ".md`.",
+              "Budget réservé : `$1.50` (`ledger` notifié).",
+              "Notification à 50% et à 100% via Telegram."
+            ]}] : [])
+          ]
+        };
+        setMessages(m => [...m, reply]);
+      }
+    };
+    setTimeout(next, 700);
+  };
+
+  const onKey = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      send();
+    }
+  };
+
+  // session totals
+  const totals = useMemo(() => {
+    return {
+      tokens: 24189 + messages.length * 1240,
+      cost: 0.42 + messages.length * 0.018,
+      msgs: messages.length,
+    };
+  }, [messages]);
+
+  return (
+    <>
+      <header className="chat-hd">
+        <div className="av">{agent.glyph}<span className="live"></span></div>
+        <div>
+          <div className="name-row">
+            <h1>{agent.name}</h1>
+            <span className="badge ok"><span className="d"></span>active</span>
+            <span className="badge" style={{textTransform:"none",fontFamily:"'JetBrains Mono',monospace",fontSize:10.5}}>{agent.model}</span>
+          </div>
+          <div className="role">{agent.role} · pid 24819 · runtime 00:14:22</div>
+        </div>
+        <div className="chat-hd-stats">
+          <div className="stat-pair">
+            <span className="k">last call · tokens</span>
+            <span className="v">{(totals.tokens).toLocaleString()}</span>
+          </div>
+          <div className="stat-pair">
+            <span className="k">session cost</span>
+            <span className="v">${totals.cost.toFixed(2)}</span>
+          </div>
+          <a className="btn btn-ghost btn-sm" href={`Edit Agent Config.html`}>
+            <Icon k="edit" size={12} /><span>Edit config</span>
+          </a>
+        </div>
+      </header>
+
+      <div className="chat-body scroll" ref={bodyRef}>
+        <div className="day-divider">
+          <span className="ln"></span>
+          <span>Today · 11 May 2026</span>
+          <span className="ln"></span>
+        </div>
+        {messages.map(m => <Bubble key={m.id} m={m} />)}
+        {thinking && <Thinking step={thinking} />}
+      </div>
+
+      <div className="input-area">
+        <div className="input-wrap">
+          {attachments.length > 0 && (
+            <div className="attached">
+              {attachments.map((a,i) =>
+                <span key={i} className="at">
+                  <Icon k="doc" size={11} />{a}<span className="x" onClick={()=>setAttachments(xs=>xs.filter((_,j)=>j!==i))}>×</span>
+                </span>
+              )}
+            </div>
+          )}
+          <div className="input-row">
+            <button className="ic-btn" title="Attach file"
+                    onClick={()=>setAttachments(xs=>[...xs, `screenshot-${(Math.random()*999|0)}.png`])}>
+              <Icon k="attach" size={16}/>
+            </button>
+            <textarea ref={taRef} placeholder={`Message ${agent.name}…  (⏎ to send, ⇧⏎ for newline)`}
+                      value={draft} onChange={e=>setDraft(e.target.value)} onKeyDown={onKey}
+                      rows={1}></textarea>
+            <button className="send-btn" onClick={send} disabled={!draft.trim() && attachments.length === 0}>
+              <Icon k="send" size={14} />
+            </button>
+          </div>
+          <div className="input-footer">
+            <div className="mode-tabs">
+              {["question","mission","routine"].map(m =>
+                <div key={m} data-m={m} className={"mt"+(mode===m?" on":"")} onClick={()=>setMode(m)}>
+                  <span className="d"></span><span style={{textTransform:"capitalize"}}>{m}</span>
+                </div>
+              )}
+            </div>
+            <span className="hint" style={{marginLeft:10,color:"var(--text-faint)"}}>
+              {{
+                question:"single Q&A · no side effects",
+                mission: "multi-step task · agent owns it until done",
+                routine: "scheduled · runs in background"
+              }[mode]}
+            </span>
+            <span className="spacer"></span>
+            <span className="hint"><span className="kbd">⌘ /</span>switch agent</span>
+            <span className="hint" style={{marginLeft:8}}><span className="kbd">esc</span>cancel</span>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+
+</body>
+</html>

@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>MOS — Skills Catalog</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="agent-os.css" />
+<style>
+  .page{min-height:calc(100vh - 48px);display:flex;flex-direction:column}
+  .ph{padding:20px 28px 14px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:14px;flex-shrink:0}
+  .ph-top{display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap}
+  .ph-top h1{margin:0;font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-faint);font-weight:600;font-family:'JetBrains Mono',monospace}
+  .ph-top h1 + .big{margin-top:4px;font-size:24px;font-weight:600;letter-spacing:-0.01em;color:var(--text)}
+  .ph-top .sub{color:var(--text-faint);font-size:12px;margin-top:5px}
+  .ph-top .sub b{color:var(--text);font-family:'JetBrains Mono',monospace;font-weight:500}
+  .ph-top .right{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .searchbar{position:relative;width:280px}
+  .searchbar input{padding-left:30px;height:32px}
+  .searchbar svg{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--text-faint)}
+
+  .filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .filter-chip{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border:1px solid var(--line-strong);border-radius:5px;
+    background:var(--bg);font-size:11.5px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;cursor:default}
+  .filter-chip:hover{color:var(--text)}
+  .filter-chip.on{border-color:var(--accent-line);background:var(--accent-soft);color:var(--text)}
+  .filter-chip .ct{color:var(--text-faint);margin-left:3px}
+  .filter-chip.on .ct{color:var(--accent)}
+  .filter-lbl{font-size:10.5px;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-faint);margin-right:4px}
+
+  .grid{display:grid;grid-template-columns:repeat(3, 1fr);gap:14px;padding:18px 28px 32px}
+  @media (max-width: 1100px){ .grid{grid-template-columns:repeat(2, 1fr)} }
+
+  .skill{background:var(--bg-elev);border:1px solid var(--line);border-radius:11px;padding:14px;display:flex;flex-direction:column;gap:10px;
+    cursor:default;transition:border-color .14s ease, background .14s ease, transform .14s ease;position:relative}
+  .skill:hover{border-color:var(--line-bright);background:var(--bg-elev-2)}
+  .skill.active{border-color:var(--accent-line);background:linear-gradient(180deg, rgba(224,122,95,0.06), transparent 70%)}
+  .skill.active::before{content:"";position:absolute;left:14px;right:14px;top:-1px;height:2px;background:var(--accent);border-radius:1px}
+
+  .sk-top{display:flex;align-items:flex-start;gap:10px}
+  .sk-name{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:500;color:var(--text);letter-spacing:-0.005em;flex:1;min-width:0}
+  .sk-name .slash{color:var(--accent)}
+  .skill:not(.active) .sk-name .slash{color:var(--text-faint)}
+
+  .sk-desc{font-size:12.5px;color:var(--text-dim);line-height:1.55;min-height:36px}
+
+  .sk-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:auto;padding-top:8px;border-top:1px solid var(--line)}
+  .cat-chip{font-size:10px;text-transform:uppercase;letter-spacing:0.08em;padding:2px 7px;border-radius:4px;
+    font-family:'JetBrains Mono',monospace;background:var(--bg);border:1px solid var(--line-strong);color:var(--text-dim)}
+  .cat-chip.dev    {color:#7ec5ff;background:rgba(126,197,255,0.08);border-color:rgba(126,197,255,0.2)}
+  .cat-chip.content{color:#c89cff;background:rgba(200,156,255,0.08);border-color:rgba(200,156,255,0.2)}
+  .cat-chip.ops    {color:#f0cf85;background:rgba(240,207,133,0.08);border-color:rgba(240,207,133,0.2)}
+  .cat-chip.life   {color:#ff9ec5;background:rgba(255,158,197,0.08);border-color:rgba(255,158,197,0.2)}
+  .src-chip{font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-faint);font-family:'JetBrains Mono',monospace}
+  .stack{display:inline-flex;margin-left:auto}
+  .stack .av{width:20px;height:20px;border-radius:5px;background:var(--bg);border:1.5px solid var(--bg-elev);
+    display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--text);font-weight:600;
+    margin-left:-6px;position:relative;z-index:0}
+  .stack .av:first-child{margin-left:0}
+  .skill.active .stack .av{border-color:var(--bg-elev)}
+  .stack .more{background:var(--bg-elev-2);color:var(--text-faint);font-size:9.5px}
+
+  .invokes{font-size:10.5px;color:var(--text-faint);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:4px}
+  .invokes b{color:var(--text);font-weight:500}
+
+  /* mini spark */
+  .spark{display:inline-flex;align-items:flex-end;gap:2px;height:14px}
+  .spark span{width:3px;background:var(--text-faint);border-radius:1px;display:inline-block}
+  .skill.active .spark span{background:var(--accent)}
+
+  /* modal */
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+    z-index:50;display:flex;align-items:center;justify-content:center;padding:30px}
+  .modal{width:min(820px,100%);max-height:90vh;background:var(--bg);border:1px solid var(--line-strong);border-radius:13px;
+    display:flex;flex-direction:column;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,0.6)}
+  .modal-hd{padding:18px 22px 14px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;gap:12px}
+  .modal-hd .name{font-family:'JetBrains Mono',monospace;font-size:18px;color:var(--text);font-weight:500}
+  .modal-hd .name .slash{color:var(--accent)}
+  .modal-hd .desc{font-size:13px;color:var(--text-dim);margin-top:4px;line-height:1.5}
+  .modal-hd .meta{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
+  .modal-hd .close{margin-left:auto;width:28px;height:28px;border:0;background:transparent;color:var(--text-faint);border-radius:6px;
+    display:flex;align-items:center;justify-content:center}
+  .modal-hd .close:hover{background:var(--bg-elev-2);color:var(--text)}
+
+  .modal-tabs{display:flex;gap:0;padding:0 22px;border-bottom:1px solid var(--line);background:var(--bg-elev)}
+  .modal-tabs .t{padding:10px 0;margin-right:18px;font-size:12px;color:var(--text-dim);cursor:default;border-bottom:2px solid transparent}
+  .modal-tabs .t:hover{color:var(--text)}
+  .modal-tabs .t.on{color:var(--text);border-bottom-color:var(--accent)}
+
+  .modal-body{flex:1;overflow-y:auto;padding:18px 22px 22px}
+
+  .full-desc{color:var(--text);font-size:13px;line-height:1.65}
+  .full-desc h3{font-size:12px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-faint);margin:14px 0 6px;font-family:'JetBrains Mono',monospace}
+  .full-desc h3:first-child{margin-top:0}
+  .full-desc ul{margin:6px 0;padding-left:20px}
+  .full-desc li{margin:3px 0}
+  .full-desc code{background:rgba(255,255,255,0.07);padding:1px 5px;border-radius:3px;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#f0d3a8}
+  .full-desc strong{color:var(--text);font-weight:600}
+
+  .code-block{background:#0a0a0a;border:1px solid var(--line);border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:11.5px;line-height:1.6;
+    color:var(--text-dim);overflow:hidden;margin-top:8px}
+  .code-hd{display:flex;align-items:center;gap:8px;padding:7px 11px;border-bottom:1px solid var(--line);font-size:10.5px;color:var(--text-faint);
+    text-transform:uppercase;letter-spacing:0.08em}
+  .code-hd .lang{color:var(--accent)}
+  .code-body{padding:11px 12px;overflow-x:auto;max-height:320px;overflow-y:auto;white-space:pre}
+  .code-body .k{color:#c89cff}
+  .code-body .s{color:#a4d984}
+  .code-body .n{color:#f0d3a8}
+  .code-body .c{color:var(--text-faint);font-style:italic}
+  .code-body .f{color:#7ec5ff}
+
+  .activation-list{display:flex;flex-direction:column;gap:1px;background:var(--line);border-radius:7px;overflow:hidden;border:1px solid var(--line)}
+  .ag-row{display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--bg-elev);cursor:default}
+  .ag-row:hover{background:var(--bg-elev-2)}
+  .ag-row .g{width:26px;height:26px;border-radius:6px;background:var(--bg);border:1px solid var(--line-strong);
+    display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:12px;color:var(--text)}
+  .ag-row.on .g{color:var(--accent);border-color:var(--accent-line)}
+  .ag-row .nm{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text)}
+  .ag-row .role{font-size:11px;color:var(--text-faint);margin-left:0}
+  .ag-row .usage{margin-left:auto;display:flex;align-items:center;gap:14px;font-size:11px;color:var(--text-dim)}
+  .ag-row .usage .v{font-family:'JetBrains Mono',monospace;color:var(--text);font-variant-numeric:tabular-nums}
+
+  .usage-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);
+    border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:14px}
+  .usage-stats .us{padding:11px 14px;background:var(--bg-elev);display:flex;flex-direction:column;gap:3px}
+  .usage-stats .us .k{font-size:9.5px;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-faint)}
+  .usage-stats .us .v{font-family:'JetBrains Mono',monospace;font-size:18px;color:var(--text);font-variant-numeric:tabular-nums;font-weight:500}
+  .usage-stats .us .d{font-size:10.5px;color:var(--ok);font-family:'JetBrains Mono',monospace}
+  .usage-stats .us .d.warn{color:var(--warn)}
+
+  .usage-chart{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:14px;display:flex;align-items:flex-end;gap:3px;height:120px}
+  .usage-chart .bar{flex:1;background:var(--text-faint);border-radius:2px 2px 0 0;position:relative;min-height:2px;opacity:0.5;transition:opacity .14s ease}
+  .usage-chart .bar.peak{background:var(--accent);opacity:1;box-shadow:0 0 12px rgba(224,122,95,0.4)}
+  .usage-chart .bar:hover{opacity:1;background:var(--accent)}
+
+  .modal-foot{padding:14px 22px;border-top:1px solid var(--line);display:flex;align-items:center;gap:10px;background:var(--bg-elev)}
+  .modal-foot .meta{font-size:11.5px;color:var(--text-faint);font-family:'JetBrains Mono',monospace}
+
+</style>
+</head>
+<body>
+
+<header class="os-top">
+  <div class="os-brand">
+    <div class="os-brand-mark"></div>
+    <div><div class="os-brand-name">MOS <span class="os-brand-sub mono">0.42.1</span></div></div>
+  </div>
+  <nav class="os-tabs">
+    <a class="os-tab" href="Agent Visualizer.html"><span class="dot"></span>Mesh</a>
+    <a class="os-tab" href="Edit Agent Config.html"><span class="dot"></span>Agents</a>
+    <a class="os-tab" href="Chat Agent.html"><span class="dot"></span>Chat</a>
+    <a class="os-tab" href="Memory Editor.html"><span class="dot"></span>Memory</a>
+    <a class="os-tab" href="Missions.html"><span class="dot"></span>Missions</a>
+    <a class="os-tab" href="Kanban Board.html"><span class="dot"></span>Board</a>
+    <a class="os-tab active"><span class="dot"></span>Skills</a>
+    <a class="os-tab" href="Dashboard.html">Dashboard</a>
+  </nav>
+  <div class="os-top-right">
+    <span class="mono" style="color:var(--text-faint)">trace.id run_4f2a91</span>
+    <div class="os-pill"><span class="pulse"></span><span>local · airgapped</span></div>
+  </div>
+</header>
+
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useMemo } = React;
+
+const AGENTS = {
+  kernel:{glyph:"K",role:"orchestrator"}, atlas:{glyph:"A",role:"retriever"},
+  loom:{glyph:"L",role:"reasoner"}, forge:{glyph:"F",role:"executor"},
+  ledger:{glyph:"$",role:"sentinel"}, scout:{glyph:"S",role:"retriever"},
+  harbor:{glyph:"H",role:"sentinel"}, echo:{glyph:"E",role:"scribe"}
+};
+
+const SKILLS = [
+  // dev
+  { id:"pr-create", name:"/pr-create", cat:"dev", src:"built-in", active:true,
+    desc:"Open a pull request with a structured summary, risk note, and test parity.",
+    agents:["forge","kernel"], invokes:42, peak:38, by:{forge:34,kernel:8},
+    full:`<h3>What it does</h3>
+<p>Wraps <code>git</code> commands plus the GitHub CLI to open a PR with a body that follows the team template — <strong>root cause / fix / risk / tests</strong>.</p>
+<h3>When to use</h3>
+<ul><li>After <code>forge</code> applies a write and tests pass.</li><li>Manually via <code>/pr-create base=main</code> in any agent chat.</li></ul>
+<h3>Permissions required</h3>
+<ul><li><code>shell</code>, <code>git.push</code>, <code>network</code> (api.github.com)</li></ul>`,
+    code:`<span class="c">// .mos/skills/pr-create.ts</span>
+<span class="k">export async function</span> <span class="f">prCreate</span>(ctx, { base = <span class="s">"main"</span>, title, body }) {
+  <span class="k">await</span> ctx.policy.check(<span class="s">"git.push"</span>);
+  <span class="k">await</span> ctx.shell(<span class="s">\`git push origin HEAD:\${ctx.branch}\`</span>);
+  <span class="k">return</span> ctx.gh.pr.create({
+    base,
+    head: ctx.branch,
+    title: title ?? <span class="k">await</span> ctx.summarize(ctx.diff),
+    body:  body  ?? <span class="k">await</span> ctx.template(<span class="s">"pr-body"</span>),
+  });
+}` },
+  { id:"diff-explain", name:"/diff-explain", cat:"dev", src:"built-in", active:true,
+    desc:"Explain a git diff in plain prose with risk and rollback notes.",
+    agents:["forge","loom"], invokes:18, peak:12, by:{forge:11,loom:7},
+    full:`<h3>What it does</h3><p>Pipes a diff through <code>loom</code> and returns three paragraphs: <strong>intent</strong>, <strong>impact</strong>, <strong>rollback</strong>.</p>`,
+    code:`<span class="c">// .mos/skills/diff-explain.ts</span>
+<span class="k">export async function</span> <span class="f">diffExplain</span>(ctx, { ref = <span class="s">"HEAD"</span> }) {
+  <span class="k">const</span> diff = <span class="k">await</span> ctx.shell(<span class="s">\`git show \${ref} --stat -p\`</span>);
+  <span class="k">return</span> ctx.delegate(<span class="s">"loom"</span>, { prompt: PROMPT, attach: diff });
+}` },
+  { id:"test-flaky", name:"/test-flaky", cat:"dev", src:"custom", active:false,
+    desc:"Re-run a test 20× and report stability percentage and stack-trace clusters.",
+    agents:["forge"], invokes:6, peak:3, by:{forge:6},
+    full:`<h3>What it does</h3><p>Runs <code>vitest --run --no-coverage</code> twenty times and clusters failures by stack-frame.</p>`,
+    code:`<span class="c">// .mos/skills/test-flaky.ts</span>
+<span class="k">export async function</span> <span class="f">testFlaky</span>(ctx, { spec, n = <span class="n">20</span> }) {
+  <span class="k">const</span> runs = [];
+  <span class="k">for</span> (<span class="k">let</span> i = <span class="n">0</span>; i &lt; n; i++) runs.push(<span class="k">await</span> ctx.shell(<span class="s">\`vitest run \${spec}\`</span>));
+  <span class="k">return</span> ctx.cluster(runs.filter(r =&gt; r.exit !== <span class="n">0</span>));
+}` },
+  { id:"deploy-staging", name:"/deploy-staging", cat:"dev", src:"built-in", active:true,
+    desc:"Trigger the staging pipeline, watch for completion, post the URL.",
+    agents:["forge","harbor"], invokes:11, peak:7, by:{forge:7,harbor:4} },
+  { id:"db-migrate", name:"/db-migrate", cat:"dev", src:"custom", active:false,
+    desc:"Plan and apply a schema migration with reversible rollback.",
+    agents:["forge"], invokes:3, peak:2, by:{forge:3} },
+
+  // content
+  { id:"summarize", name:"/summarize", cat:"content", src:"built-in", active:true,
+    desc:"Compress a transcript or doc to N bullets while preserving decisions.",
+    agents:["loom","atlas","kernel"], invokes:87, peak:32, by:{loom:62,atlas:18,kernel:7},
+    full:`<h3>What it does</h3><p>Splits source by speaker turn / paragraph, scores salience, returns N bullets in the user's voice (loaded from <code>~/.mos/voice.md</code>).</p>`,
+    code:`<span class="c">// .mos/skills/summarize.ts</span>
+<span class="k">export async function</span> <span class="f">summarize</span>(ctx, { source, n = <span class="n">5</span> }) {
+  <span class="k">const</span> voice = <span class="k">await</span> ctx.read(<span class="s">"~/.mos/voice.md"</span>);
+  <span class="k">return</span> ctx.complete({ source, n, voice });
+}` },
+  { id:"investor-update", name:"/investor-update", cat:"content", src:"custom", active:true,
+    desc:"Draft a structured weekly update: wins, risks, asks, numbers.",
+    agents:["loom"], invokes:9, peak:2, by:{loom:9} },
+  { id:"translate-fr", name:"/translate-fr", cat:"content", src:"built-in", active:false,
+    desc:"Translate to French preserving tone, jargon, and inline code.",
+    agents:["loom"], invokes:4, peak:2, by:{loom:4} },
+  { id:"voice-match", name:"/voice-match", cat:"content", src:"custom", active:true,
+    desc:"Rewrite a draft to match your stored voice profile.",
+    agents:["loom"], invokes:14, peak:6, by:{loom:14} },
+
+  // ops
+  { id:"budget-cap", name:"/budget-cap", cat:"ops", src:"built-in", active:true,
+    desc:"Halt any agent that exceeds its hourly budget; alert via channels.",
+    agents:["ledger","kernel"], invokes:241, peak:42, by:{ledger:198,kernel:43},
+    full:`<h3>What it does</h3><p>Polls <code>cost.current()</code> every 30s. On overrun: <code>agent.halt()</code> and broadcast to channels marked alert-only.</p>`,
+    code:`<span class="c">// .mos/skills/budget-cap.ts</span>
+<span class="k">export async function</span> <span class="f">budgetCap</span>(ctx, { capUsd, intervalMs = <span class="n">30000</span> }) {
+  <span class="k">while</span> (<span class="k">true</span>) {
+    <span class="k">const</span> spent = <span class="k">await</span> ctx.budget.read();
+    <span class="k">if</span> (spent &gt; capUsd) {
+      <span class="k">await</span> ctx.halt(<span class="s">"budget.cap.exceeded"</span>);
+      <span class="k">await</span> ctx.alert.broadcast({ spent, capUsd });
+    }
+    <span class="k">await</span> ctx.sleep(intervalMs);
+  }
+}` },
+  { id:"backup-encrypted", name:"/backup-encrypted", cat:"ops", src:"built-in", active:true,
+    desc:"Backup a folder to an encrypted drive with rotation.",
+    agents:["forge"], invokes:7, peak:1, by:{forge:7} },
+  { id:"inbox-triage", name:"/inbox-triage", cat:"ops", src:"custom", active:true,
+    desc:"Score and bucket new emails/messages, surface only what needs you.",
+    agents:["scout","loom"], invokes:62, peak:24, by:{scout:48,loom:14} },
+  { id:"rate-limit", name:"/rate-limit", cat:"ops", src:"built-in", active:true,
+    desc:"Backoff and retry external API calls per quota.",
+    agents:["harbor"], invokes:182, peak:38, by:{harbor:182} },
+  { id:"cron-spawn", name:"/cron-spawn", cat:"ops", src:"custom", active:false,
+    desc:"Schedule recurring missions and persist them across restarts.",
+    agents:["kernel"], invokes:0, peak:0, by:{} },
+
+  // life
+  { id:"meal-plan", name:"/meal-plan", cat:"life", src:"custom", active:false,
+    desc:"Plan a week of meals based on stored prefs and grocery state.",
+    agents:["loom"], invokes:0, peak:0, by:{} },
+  { id:"journal", name:"/journal", cat:"life", src:"custom", active:true,
+    desc:"Capture a daily reflection from a 3-question prompt.",
+    agents:["loom"], invokes:11, peak:1, by:{loom:11} },
+  { id:"workout-log", name:"/workout-log", cat:"life", src:"custom", active:false,
+    desc:"Track sets, reps and progressive overload from a short voice note.",
+    agents:["scout","loom"], invokes:0, peak:0, by:{} },
+];
+
+const CATS = [
+  { key:"dev",     label:"Dev",     ct: SKILLS.filter(s=>s.cat==="dev").length },
+  { key:"content", label:"Content", ct: SKILLS.filter(s=>s.cat==="content").length },
+  { key:"ops",     label:"Ops",     ct: SKILLS.filter(s=>s.cat==="ops").length },
+  { key:"life",    label:"Life",    ct: SKILLS.filter(s=>s.cat==="life").length },
+];
+
+const Icon = ({ k, size=14 }) => {
+  const s = { width:size, height:size, display:"inline-block", verticalAlign:"middle" };
+  const stroke = { fill:"none", stroke:"currentColor", strokeWidth:1.5, strokeLinecap:"round", strokeLinejoin:"round" };
+  switch(k){
+    case "search": return <svg style={s} viewBox="0 0 20 20" {...stroke}><circle cx="9" cy="9" r="5.5"/><path d="M13 13l3.5 3.5"/></svg>;
+    case "x":      return <svg style={s} viewBox="0 0 20 20" {...stroke}><path d="M5 5l10 10M15 5L5 15"/></svg>;
+    case "plus":   return <svg style={s} viewBox="0 0 20 20" {...stroke}><path d="M10 4v12M4 10h12"/></svg>;
+  }
+  return null;
+};
+
+function Toggle({ on, onChange }){
+  return <div className={"toggle"+(on?" on":"")} onClick={(e)=>{e.stopPropagation(); onChange(!on);}}><div className="knob"></div></div>;
+}
+
+function Spark({ peak }){
+  const heights = [3,5,4,8,6,9,12,8,11,14,9,12,peak];
+  const max = Math.max(...heights, 1);
+  return <span className="spark">{heights.map((h,i) => <span key={i} style={{height:Math.max(2, Math.round(h/max*14))+"px"}}></span>)}</span>;
+}
+
+function App(){
+  const [skills, setSkills] = useState(SKILLS);
+  const [search, setSearch] = useState("");
+  const [cat, setCat] = useState(null);
+  const [src, setSrc] = useState(null);
+  const [open, setOpen] = useState(null);
+  const [tab, setTab] = useState("overview");
+
+  const filtered = skills.filter(s =>
+    (!cat || s.cat === cat) &&
+    (!src || s.src === src) &&
+    (!search.trim() || (s.name+" "+s.desc).toLowerCase().includes(search.toLowerCase())));
+
+  const active = skills.filter(s => s.active).length;
+
+  const toggleActive = (id) => setSkills(xs => xs.map(s => s.id===id ? {...s, active:!s.active}: s));
+  const toggleAgentForSkill = (id, agent) => setSkills(xs => xs.map(s => {
+    if (s.id !== id) return s;
+    const has = s.agents.includes(agent);
+    return { ...s, agents: has ? s.agents.filter(a=>a!==agent) : [...s.agents, agent] };
+  }));
+
+  const openSkill = open ? skills.find(s => s.id === open) : null;
+
+  return (
+    <div className="page">
+      <div className="ph">
+        <div className="ph-top">
+          <div>
+            <h1>Skills catalog</h1>
+            <div className="big">Slash-commands available to every agent</div>
+            <div className="sub"><b>{skills.length}</b> skills · <b>{active}</b> active on <b>_main</b> · <b>{skills.filter(s=>s.src==="custom").length}</b> custom</div>
+          </div>
+          <div className="right">
+            <div className="searchbar">
+              <Icon k="search" />
+              <input className="input" placeholder="search skills by name or purpose…" value={search} onChange={e=>setSearch(e.target.value)} />
+            </div>
+            <button className="btn btn-primary btn-sm"><Icon k="plus" size={12}/>New skill</button>
+          </div>
+        </div>
+        <div className="filters">
+          <span className="filter-lbl">category</span>
+          <span className={"filter-chip"+(cat===null?" on":"")} onClick={()=>setCat(null)}>all <span className="ct">{skills.length}</span></span>
+          {CATS.map(c => (
+            <span key={c.key} className={"filter-chip"+(cat===c.key?" on":"")} onClick={()=>setCat(cat===c.key?null:c.key)}>
+              {c.label} <span className="ct">{c.ct}</span>
+            </span>
+          ))}
+          <span className="filter-lbl" style={{marginLeft:14}}>source</span>
+          <span className={"filter-chip"+(src===null?" on":"")} onClick={()=>setSrc(null)}>any</span>
+          <span className={"filter-chip"+(src==="built-in"?" on":"")} onClick={()=>setSrc(src==="built-in"?null:"built-in")}>built-in <span className="ct">{skills.filter(s=>s.src==="built-in").length}</span></span>
+          <span className={"filter-chip"+(src==="custom"?" on":"")} onClick={()=>setSrc(src==="custom"?null:"custom")}>custom <span className="ct">{skills.filter(s=>s.src==="custom").length}</span></span>
+          <span style={{marginLeft:"auto",fontSize:11,color:"var(--text-faint)",fontFamily:"'JetBrains Mono',monospace"}}>{filtered.length} of {skills.length}</span>
+        </div>
+      </div>
+
+      <div className="grid">
+        {filtered.map(s => {
+          const agentsShown = s.agents.slice(0,4);
+          const more = s.agents.length - agentsShown.length;
+          return (
+            <div key={s.id} className={"skill"+(s.active?" active":"")} onClick={()=>{setOpen(s.id); setTab("overview");}}>
+              <div className="sk-top">
+                <span className="sk-name"><span className="slash">/</span>{s.name.replace(/^\//,"")}</span>
+                <Toggle on={s.active} onChange={()=>toggleActive(s.id)} />
+              </div>
+              <div className="sk-desc">{s.desc}</div>
+              <div className="sk-meta">
+                <span className={"cat-chip "+s.cat}>{s.cat}</span>
+                <span className="src-chip">· {s.src}</span>
+                <span className="invokes"><Spark peak={s.peak}/><b>{s.invokes}</b>/30d</span>
+                <span className="stack">
+                  {agentsShown.map((a,i) => <span key={a} className="av" style={{zIndex:agentsShown.length-i}} title={a}>{AGENTS[a].glyph}</span>)}
+                  {more > 0 && <span className="av more">+{more}</span>}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {openSkill && (
+        <div className="modal-bg" onClick={()=>setOpen(null)}>
+          <div className="modal" onClick={e=>e.stopPropagation()}>
+            <div className="modal-hd">
+              <div style={{flex:1}}>
+                <div className="name"><span className="slash">/</span>{openSkill.name.replace(/^\//,"")}</div>
+                <div className="desc">{openSkill.desc}</div>
+                <div className="meta">
+                  <span className={"cat-chip "+openSkill.cat}>{openSkill.cat}</span>
+                  <span className="src-chip">{openSkill.src}</span>
+                  <span className="src-chip">· {openSkill.invokes} invokes / 30d</span>
+                  <span className="src-chip">· enabled on {openSkill.agents.length} agents</span>
+                </div>
+              </div>
+              <Toggle on={openSkill.active} onChange={()=>toggleActive(openSkill.id)} />
+              <button className="close" onClick={()=>setOpen(null)}><Icon k="x"/></button>
+            </div>
+            <div className="modal-tabs">
+              <div className={"t"+(tab==="overview"?" on":"")} onClick={()=>setTab("overview")}>Overview</div>
+              <div className={"t"+(tab==="code"?" on":"")}     onClick={()=>setTab("code")}>Code</div>
+              <div className={"t"+(tab==="activation"?" on":"")} onClick={()=>setTab("activation")}>Activation</div>
+              <div className={"t"+(tab==="usage"?" on":"")}    onClick={()=>setTab("usage")}>Usage</div>
+            </div>
+            <div className="modal-body scroll">
+              {tab === "overview" && (
+                <div className="full-desc" dangerouslySetInnerHTML={{__html: openSkill.full || `<h3>Description</h3><p>${openSkill.desc}</p><h3>Status</h3><p>Skill is currently <strong>${openSkill.active?"active":"inactive"}</strong>. Enable agents in the <em>Activation</em> tab to start invoking it.</p>`}}></div>
+              )}
+              {tab === "code" && (
+                <div className="code-block">
+                  <div className="code-hd">
+                    <span>.mos/skills/{openSkill.id}.ts</span>
+                    <span style={{marginLeft:"auto"}} className="lang">typescript</span>
+                  </div>
+                  <pre className="code-body scroll" dangerouslySetInnerHTML={{__html: openSkill.code || `<span class="c">// .mos/skills/${openSkill.id}.ts</span>
+<span class="k">export async function</span> <span class="f">${openSkill.id.replace(/-([a-z])/g, (_,c)=>c.toUpperCase())}</span>(ctx, args) {
+  <span class="c">// implementation</span>
+  <span class="k">return</span> ctx.complete(args);
+}`}}></pre>
+                </div>
+              )}
+              {tab === "activation" && (
+                <>
+                  <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:10,lineHeight:1.55}}>
+                    Toggle this skill on a per-agent basis. Disabled agents won't see it in their tool surface.
+                  </div>
+                  <div className="activation-list">
+                    {Object.entries(AGENTS).map(([id, a]) => {
+                      const on = openSkill.agents.includes(id);
+                      const used = openSkill.by?.[id] || 0;
+                      return (
+                        <div key={id} className={"ag-row"+(on?" on":"")}>
+                          <div className="g">{a.glyph}</div>
+                          <div>
+                            <div className="nm">{id}</div>
+                            <div className="role">{a.role}</div>
+                          </div>
+                          <div className="usage">
+                            <span>used <span className="v">{used}</span>× / 30d</span>
+                            <Toggle on={on} onChange={()=>toggleAgentForSkill(openSkill.id, id)} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+              {tab === "usage" && (
+                <>
+                  <div className="usage-stats">
+                    <div className="us"><span className="k">invokes 30d</span><span className="v">{openSkill.invokes}</span><span className="d">▲ +12</span></div>
+                    <div className="us"><span className="k">peak day</span><span className="v">{openSkill.peak}</span><span className="d" style={{color:"var(--text-faint)"}}>2026-05-08</span></div>
+                    <div className="us"><span className="k">agents using</span><span className="v">{openSkill.agents.length}</span><span className="d" style={{color:"var(--text-faint)"}}>of 8</span></div>
+                    <div className="us"><span className="k">avg cost / call</span><span className="v">${(0.04 + openSkill.cat.length*0.003).toFixed(3)}</span><span className="d warn">▲ +$0.002</span></div>
+                  </div>
+                  <div style={{fontSize:11,color:"var(--text-faint)",marginBottom:8,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:"'JetBrains Mono',monospace"}}>invocations · last 30d</div>
+                  <div className="usage-chart">
+                    {Array.from({length:30}).map((_,i) => {
+                      const base = Math.max(0, openSkill.invokes / 30);
+                      const v = Math.max(0, Math.round(base + (Math.sin(i*0.6+openSkill.id.length)+1)*base*0.6 + (i===24?openSkill.peak:0)*0.4));
+                      const max = Math.max(openSkill.peak, base*2.5, 1);
+                      const isPeak = i === 24;
+                      return <div key={i} className={"bar"+(isPeak?" peak":"")} style={{height: Math.max(3, v/max*100) + "%"}} title={`day ${i+1}: ${v}`}></div>;
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="modal-foot">
+              <div className="meta">.mos/skills/{openSkill.id}.ts · {openSkill.src}</div>
+              <span style={{flex:1}}></span>
+              <button className="btn btn-ghost btn-sm">Edit source</button>
+              <button className="btn btn-primary btn-sm" onClick={()=>setOpen(null)}>Done</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

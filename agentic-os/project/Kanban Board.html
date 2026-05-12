@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>MOS — Mission Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="agent-os.css" />
+<style>
+  .page{display:flex;flex-direction:column;min-height:calc(100vh - 48px);height:calc(100vh - 48px)}
+
+  .ph{padding:18px 28px 12px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:18px;flex-shrink:0;flex-wrap:wrap}
+  .ph h1{margin:0;font-size:20px;font-weight:600;letter-spacing:-0.01em}
+  .ph .sub{font-size:12px;color:var(--text-faint);margin-top:3px}
+  .ph .right{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .view-switch{display:flex;gap:2px;padding:2px;background:var(--bg-elev);border:1px solid var(--line-strong);border-radius:7px}
+  .view-switch a{padding:5px 11px;border-radius:5px;font-size:11.5px;color:var(--text-dim);text-decoration:none;cursor:default;display:flex;align-items:center;gap:6px}
+  .view-switch a.on{background:var(--bg-elev-2);color:var(--text)}
+  .view-switch a:hover{color:var(--text)}
+
+  .filters{display:flex;align-items:center;gap:8px;padding:10px 28px;border-bottom:1px solid var(--line);background:var(--bg-elev);flex-shrink:0;flex-wrap:wrap}
+  .filter{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border:1px solid var(--line-strong);border-radius:6px;
+    background:var(--bg);font-size:11.5px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;cursor:default}
+  .filter:hover{color:var(--text)}
+  .filter .k{color:var(--text-faint)}
+  .filter.on{border-color:var(--accent-line);background:var(--accent-soft);color:var(--text)}
+  .filter select{background:transparent;border:0;color:var(--text);outline:none;font-family:inherit;font-size:11.5px}
+  .filters .right{margin-left:auto;display:flex;align-items:center;gap:8px}
+  .totals{display:flex;align-items:center;gap:14px;font-size:11.5px;color:var(--text-faint)}
+  .totals b{font-family:'JetBrains Mono',monospace;color:var(--text);font-weight:500;margin-left:4px}
+
+  /* board */
+  .board{flex:1;display:grid;grid-template-columns:repeat(4, minmax(290px,1fr));gap:14px;padding:18px 22px;
+    overflow:auto;min-height:0;align-items:stretch}
+  .col{background:var(--bg-elev);border:1px solid var(--line);border-radius:11px;display:flex;flex-direction:column;
+    min-height:0;overflow:hidden}
+  .col-hd{padding:11px 13px 9px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line)}
+  .col-hd .swatch{width:8px;height:8px;border-radius:50%}
+  .col.backlog .swatch{background:#5a5a55}
+  .col.todo    .swatch{background:#7ec5ff;box-shadow:0 0 8px rgba(126,197,255,0.45)}
+  .col.doing   .swatch{background:var(--accent);box-shadow:0 0 0 4px rgba(224,122,95,0.18);animation:halo 1.6s ease-in-out infinite}
+  .col.done    .swatch{background:var(--ok);box-shadow:0 0 8px var(--ok-soft)}
+  @keyframes halo{0%,100%{box-shadow:0 0 0 3px rgba(224,122,95,0.22)}50%{box-shadow:0 0 0 6px rgba(224,122,95,0.05)}}
+  .col-hd h3{margin:0;font-size:10.5px;letter-spacing:0.12em;text-transform:uppercase;color:var(--text);font-weight:600;font-family:'JetBrains Mono',monospace}
+  .col-hd .ct{margin-left:auto;font-size:10.5px;color:var(--text-faint);font-family:'JetBrains Mono',monospace;padding:1px 6px;background:var(--bg);border:1px solid var(--line);border-radius:4px}
+  .col-hd .add{width:22px;height:22px;border-radius:5px;border:0;background:transparent;color:var(--text-faint);display:flex;align-items:center;justify-content:center;cursor:default}
+  .col-hd .add:hover{background:var(--bg-elev-2);color:var(--text)}
+
+  .col.doing{border-color:var(--accent-line);box-shadow:0 0 0 1px rgba(224,122,95,0.08), 0 0 40px rgba(224,122,95,0.05)}
+
+  .col-body{flex:1;overflow-y:auto;padding:10px 10px 14px;display:flex;flex-direction:column;gap:8px;min-height:120px}
+  .col-body.drop-over{background:rgba(224,122,95,0.05)}
+
+  /* card */
+  .card{background:var(--bg);border:1px solid var(--line-strong);border-radius:9px;padding:10px 11px 9px;
+    display:flex;flex-direction:column;gap:8px;cursor:grab;transition:border-color .14s ease, transform .14s ease, box-shadow .14s ease;
+    position:relative}
+  .card:hover{border-color:var(--line-bright)}
+  .card.dragging{opacity:0.5;cursor:grabbing}
+  .card.doing{border-color:var(--accent-line);box-shadow:0 0 0 1px rgba(224,122,95,0.18), 0 8px 24px -10px rgba(224,122,95,0.35)}
+  .card-top{display:flex;align-items:flex-start;gap:8px}
+  .card .title{font-size:13px;color:var(--text);line-height:1.4;font-weight:500;letter-spacing:-0.005em}
+  .card .actions{margin-left:auto;display:flex;gap:1px;opacity:0;transition:opacity .14s ease;flex-shrink:0}
+  .card:hover .actions{opacity:1}
+  .card .actions button{width:22px;height:22px;border:0;background:transparent;border-radius:5px;color:var(--text-faint);
+    display:flex;align-items:center;justify-content:center;cursor:default}
+  .card .actions button:hover{background:var(--bg-elev-2);color:var(--text)}
+  .card .actions button.danger:hover{color:var(--err)}
+  .card-mid{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text-faint)}
+  .card-mid .domain{font-family:'JetBrains Mono',monospace;font-size:10.5px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-faint)}
+  .card .progress{height:3px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;display:none}
+  .card.doing .progress{display:block}
+  .card .progress .fill{height:100%;background:linear-gradient(90deg,var(--accent),#ea8a72);position:relative}
+  .card .progress .fill::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.4),transparent);
+    animation:shimmer 1.6s linear infinite}
+  @keyframes shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+
+  .card-bot{display:flex;align-items:center;gap:10px;justify-content:space-between}
+  .card-bot .ag{display:inline-flex;align-items:center;gap:6px}
+  .card-bot .ag .g{width:20px;height:20px;border-radius:5px;background:var(--bg-elev-2);border:1px solid var(--line-strong);
+    display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);font-weight:600}
+  .card-bot .ag .nm{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text)}
+  .card-bot .right{display:flex;align-items:center;gap:8px;font-size:11px}
+  .card .cost{font-family:'JetBrains Mono',monospace;color:var(--text-dim);font-variant-numeric:tabular-nums}
+  .card .cost .est{color:var(--text-faint);font-size:9.5px;text-transform:uppercase;letter-spacing:0.06em;margin-right:3px}
+  .card .due{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--text-faint);display:inline-flex;align-items:center;gap:4px}
+  .card .due.soon{color:var(--warn)}
+  .card .due.over{color:var(--err)}
+
+  .card .tags{display:flex;gap:4px;flex-wrap:wrap}
+  .card .tg{font-size:9.5px;text-transform:uppercase;letter-spacing:0.06em;padding:1px 5px;border-radius:3px;
+    background:var(--bg-elev-2);color:var(--text-faint);font-family:'JetBrains Mono',monospace}
+  .card .tg.eng    {color:#7ec5ff;background:rgba(126,197,255,0.10)}
+  .card .tg.writing{color:#c89cff;background:rgba(200,156,255,0.10)}
+  .card .tg.research{color:#8be38b;background:rgba(139,227,139,0.10)}
+  .card .tg.ops    {color:#f0cf85;background:rgba(240,207,133,0.10)}
+  .card .tg.life   {color:#ff9ec5;background:rgba(255,158,197,0.10)}
+
+  .card.done .title{color:var(--text-dim)}
+  .card.done .check{width:14px;height:14px;border-radius:50%;background:var(--ok);
+    display:inline-flex;align-items:center;justify-content:center;color:#0a0a0a;flex-shrink:0;margin-top:1px}
+
+  .new-card{display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;
+    border:1px dashed var(--line-bright);border-radius:8px;color:var(--text-faint);font-size:11.5px;cursor:default;background:transparent}
+  .new-card:hover{color:var(--text);border-color:var(--accent-line);background:rgba(224,122,95,0.04)}
+
+  /* drop indicator line */
+  .col-body.drop-over{outline:1px dashed var(--accent-line);outline-offset:-4px;border-radius:8px}
+
+</style>
+</head>
+<body>
+
+<header class="os-top">
+  <div class="os-brand">
+    <div class="os-brand-mark"></div>
+    <div><div class="os-brand-name">MOS <span class="os-brand-sub mono">0.42.1</span></div></div>
+  </div>
+  <nav class="os-tabs">
+    <a class="os-tab" href="Agent Visualizer.html"><span class="dot"></span>Mesh</a>
+    <a class="os-tab" href="Edit Agent Config.html"><span class="dot"></span>Agents</a>
+    <a class="os-tab" href="Chat Agent.html"><span class="dot"></span>Chat</a>
+    <a class="os-tab" href="Memory Editor.html"><span class="dot"></span>Memory</a>
+    <a class="os-tab" href="Missions.html"><span class="dot"></span>Missions</a>
+    <a class="os-tab active"><span class="dot"></span>Board</a>
+  </nav>
+  <div class="os-top-right">
+    <span class="mono" style="color:var(--text-faint)">trace.id run_4f2a91</span>
+    <div class="os-pill"><span class="pulse"></span><span>local · airgapped</span></div>
+  </div>
+</header>
+
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useMemo } = React;
+
+const AGENTS = {
+  kernel:{glyph:"K"}, atlas:{glyph:"A"}, loom:{glyph:"L"}, forge:{glyph:"F"},
+  ledger:{glyph:"$"}, scout:{glyph:"S"}, harbor:{glyph:"H"}, echo:{glyph:"E"}
+};
+
+const SEED = [
+  // backlog
+  { id:"k_01", title:"Rewrite onboarding copy · 4 personas",         agent:"loom",   col:"backlog", domain:"writing",     cost:null,     tags:["writing"] },
+  { id:"k_02", title:"Audit data retention policy · GDPR pass",      agent:"kernel", col:"backlog", domain:"ops",         cost:null,     tags:["ops","policy"] },
+  { id:"k_03", title:"Research: best CRDT lib for offline-first",    agent:"atlas",  col:"backlog", domain:"research",    cost:0.80,     tags:["research"] },
+  { id:"k_04", title:"Plan Q3 hiring · 2 IC eng, 1 design",          agent:"loom",   col:"backlog", domain:"product",     cost:null,     tags:["writing"] },
+
+  // todo
+  { id:"k_10", title:"Migrate webhook subscriber to v2 API",         agent:"forge",  col:"todo",    domain:"engineering", cost:1.20, due:"Today 18:00", dueSoon:true, tags:["eng"] },
+  { id:"k_11", title:"Generate weekly investor update v3",           agent:"loom",   col:"todo",    domain:"writing",     cost:0.40, due:"Tomorrow",  tags:["writing"] },
+  { id:"k_12", title:"Triage incoming Telegram alerts overnight",    agent:"scout",  col:"todo",    domain:"ops",         cost:0.05, due:"23:00",     dueSoon:true, tags:["ops"] },
+  { id:"k_13", title:"Index Acme research papers · shard 4-8",       agent:"atlas",  col:"todo",    domain:"research",    cost:2.10, tags:["research"] },
+
+  // doing
+  { id:"k_20", title:"Fix auth refresh-token regression",            agent:"forge",  col:"doing",   domain:"engineering", cost:0.42, progress:62, eta:"4m",  tags:["eng"] },
+  { id:"k_21", title:"Crawl notion workspace · shard 3/8",           agent:"atlas",  col:"doing",   domain:"research",    cost:1.84, progress:38, eta:"14m", tags:["research"] },
+  { id:"k_22", title:"Watch hacker news for keyword 'mos'",          agent:"scout",  col:"doing",   domain:"research",    cost:0.02, progress:88, eta:"30s", tags:["research"] },
+
+  // done
+  { id:"k_30", title:"Synthesize Acme sync into 4 bullets",          agent:"loom",   col:"done",    domain:"writing",     cost:0.08, tags:["writing"] },
+  { id:"k_31", title:"Migrate calendar webhook to v2",               agent:"forge",  col:"done",    domain:"engineering", cost:1.21, tags:["eng"] },
+  { id:"k_32", title:"Draft response · investor email Marc",         agent:"loom",   col:"done",    domain:"writing",     cost:0.18, tags:["writing"] },
+  { id:"k_33", title:"Cap spend report · last 24h",                  agent:"ledger", col:"done",    domain:"ops",         cost:0.01, tags:["ops"] },
+  { id:"k_34", title:"Backup ~/projects/acme to encrypted drive",    agent:"forge",  col:"done",    domain:"ops",         cost:0.06, tags:["ops"] },
+];
+
+const COLS = [
+  { key:"backlog", label:"Backlog", help:"Captured, not yet committed"},
+  { key:"todo",    label:"To do",   help:"Ready to be picked up"},
+  { key:"doing",   label:"In progress", help:"An agent is on it now"},
+  { key:"done",    label:"Done",    help:"Last 24 hours"},
+];
+
+const tagClass = {
+  engineering:"eng", writing:"writing", research:"research", ops:"ops",
+  product:"eng", life:"life"
+};
+
+const Icon = ({ k, size=14 }) => {
+  const s = { width:size, height:size, display:"inline-block", verticalAlign:"middle" };
+  const stroke = { fill:"none", stroke:"currentColor", strokeWidth:1.5, strokeLinecap:"round", strokeLinejoin:"round" };
+  switch(k){
+    case "play":  return <svg style={s} viewBox="0 0 20 20" fill="currentColor"><path d="M6 4l10 6-10 6V4z"/></svg>;
+    case "pause": return <svg style={s} viewBox="0 0 20 20" fill="currentColor"><rect x="5" y="4" width="3.5" height="12" rx="0.5"/><rect x="11.5" y="4" width="3.5" height="12" rx="0.5"/></svg>;
+    case "stop":  return <svg style={s} viewBox="0 0 20 20" fill="currentColor"><rect x="5" y="5" width="10" height="10" rx="1.5"/></svg>;
+    case "arch":  return <svg style={s} viewBox="0 0 20 20" {...stroke}><rect x="3" y="5" width="14" height="3" rx="0.5"/><path d="M4 8v8h12V8M8 11h4"/></svg>;
+    case "more":  return <svg style={s} viewBox="0 0 20 20" fill="currentColor"><circle cx="5" cy="10" r="1.3"/><circle cx="10" cy="10" r="1.3"/><circle cx="15" cy="10" r="1.3"/></svg>;
+    case "plus":  return <svg style={s} viewBox="0 0 20 20" {...stroke}><path d="M10 4v12M4 10h12"/></svg>;
+    case "clock": return <svg style={s} viewBox="0 0 20 20" {...stroke}><circle cx="10" cy="10" r="7"/><path d="M10 6v4l3 2"/></svg>;
+    case "check": return <svg style={s} viewBox="0 0 14 14" {...stroke} strokeWidth="2"><path d="M3 7l3 3 5-6"/></svg>;
+  }
+  return null;
+};
+
+function App(){
+  const [items, setItems] = useState(SEED);
+  const [filter, setFilter] = useState({ agent:null, domain:null });
+  const [dragId, setDragId] = useState(null);
+  const [overCol, setOverCol] = useState(null);
+
+  const filtered = items.filter(i =>
+    (!filter.agent  || i.agent  === filter.agent) &&
+    (!filter.domain || i.domain === filter.domain)
+  );
+  const byCol = useMemo(() => {
+    const o = { backlog:[], todo:[], doing:[], done:[] };
+    filtered.forEach(i => o[i.col].push(i));
+    return o;
+  }, [filtered]);
+
+  const stats = useMemo(() => {
+    return {
+      total: items.length,
+      doing: items.filter(i=>i.col==="doing").length,
+      cost: items.reduce((s,i)=>s+(i.cost||0),0),
+    };
+  }, [items]);
+
+  const move = (id, toCol) => setItems(xs => xs.map(i => i.id===id ? {...i, col:toCol} : i));
+  const start = (id) => move(id, "doing");
+  const pause = (id) => move(id, "todo");
+  const stop  = (id) => move(id, "backlog");
+  const archive = (id) => setItems(xs => xs.filter(i => i.id !== id));
+
+  return (
+    <div className="page">
+      <div className="ph">
+        <div>
+          <h1>Mission board</h1>
+          <div className="sub">{stats.total} missions · {stats.doing} in progress · {stats.cost.toFixed(2)} USD committed today</div>
+        </div>
+        <div className="right">
+          <div className="view-switch">
+            <a href="Missions.html">Table</a>
+            <a className="on">Kanban</a>
+            <a>Calendar</a>
+          </div>
+        </div>
+      </div>
+
+      <div className="filters">
+        <span className="filter"><span className="k">agent</span>
+          <select value={filter.agent||""} onChange={e=>setFilter(f=>({...f,agent:e.target.value||null}))}>
+            <option value="">any</option>
+            {Object.keys(AGENTS).map(a=> <option key={a}>{a}</option>)}
+          </select>
+        </span>
+        <span className="filter"><span className="k">domain</span>
+          <select value={filter.domain||""} onChange={e=>setFilter(f=>({...f,domain:e.target.value||null}))}>
+            <option value="">any</option>
+            <option value="engineering">engineering</option>
+            <option value="writing">writing</option>
+            <option value="research">research</option>
+            <option value="ops">ops</option>
+            <option value="product">product</option>
+            <option value="life">life</option>
+          </select>
+        </span>
+        <div className="right">
+          <div className="totals">
+            <span>this week<b>{(stats.cost*7).toFixed(2)} USD</b></span>
+            <span>·</span>
+            <span>active agents<b>{new Set(items.filter(i=>i.col==="doing").map(i=>i.agent)).size}</b></span>
+          </div>
+          <button className="btn btn-primary btn-sm"><Icon k="plus" size={12}/>New mission</button>
+        </div>
+      </div>
+
+      <div className="board scroll">
+        {COLS.map(c => {
+          const list = byCol[c.key];
+          return (
+            <div key={c.key} className={"col "+c.key}>
+              <div className="col-hd">
+                <span className="swatch"></span>
+                <h3>{c.label}</h3>
+                <span className="ct">{list.length}</span>
+                <button className="add" title="Add to this column"><Icon k="plus" size={12}/></button>
+              </div>
+              <div className={"col-body scroll" + (overCol===c.key?" drop-over":"")}
+                   onDragOver={(e)=>{e.preventDefault(); setOverCol(c.key);}}
+                   onDragLeave={()=>setOverCol(o => o===c.key?null:o)}
+                   onDrop={(e)=>{e.preventDefault(); if(dragId) move(dragId, c.key); setDragId(null); setOverCol(null);}}>
+                {list.map(item => {
+                  const tag = item.tags[0];
+                  return (
+                    <div key={item.id} className={"card "+item.col+(dragId===item.id?" dragging":"")}
+                         draggable onDragStart={()=>setDragId(item.id)} onDragEnd={()=>{setDragId(null);setOverCol(null);}}>
+                      <div className="card-top">
+                        {item.col==="done" && <span className="check"><Icon k="check" size={9}/></span>}
+                        <div className="title">{item.title}</div>
+                        <div className="actions">
+                          {item.col!=="doing" && item.col!=="done" && <button title="Start" onClick={()=>start(item.id)}><Icon k="play" size={10}/></button>}
+                          {item.col==="doing" && <button title="Pause" onClick={()=>pause(item.id)}><Icon k="pause" size={11}/></button>}
+                          {item.col==="doing" && <button title="Stop"  onClick={()=>stop(item.id)}><Icon k="stop" size={10}/></button>}
+                          {item.col==="done" && <button title="Archive" onClick={()=>archive(item.id)}><Icon k="arch" size={12}/></button>}
+                          <button className="danger" title="More"><Icon k="more" size={12}/></button>
+                        </div>
+                      </div>
+                      <div className="tags">
+                        <span className={"tg "+(tagClass[item.domain]||"ops")}>{item.domain}</span>
+                        {item.dueSoon && <span className="tg" style={{color:"var(--warn)",background:"rgba(230,184,92,0.10)"}}>due {item.due}</span>}
+                      </div>
+                      {item.col==="doing" && (
+                        <div className="progress"><div className="fill" style={{width:item.progress+"%"}}></div></div>
+                      )}
+                      <div className="card-bot">
+                        <span className="ag">
+                          <span className="g">{AGENTS[item.agent].glyph}</span>
+                          <span className="nm">{item.agent}</span>
+                        </span>
+                        <div className="right">
+                          {item.col==="doing" && item.eta && (
+                            <span className="due"><Icon k="clock" size={10}/>eta {item.eta}</span>
+                          )}
+                          {item.cost !== null && item.cost !== undefined && (
+                            <span className="cost">
+                              {item.col==="backlog" || item.col==="todo" ? <span className="est">est</span> : null}
+                              ${item.cost.toFixed(2)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                <button className="new-card"><Icon k="plus" size={11}/>add card</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

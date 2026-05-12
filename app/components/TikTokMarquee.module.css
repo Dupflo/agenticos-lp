@@ -1,0 +1,66 @@
+.viewport {
+  position: relative;
+  overflow: hidden;
+  padding-block: 0.25rem;
+}
+
+.track {
+  display: flex;
+  flex-shrink: 0;
+  width: max-content;
+  min-width: max-content;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 1rem;
+  padding-inline: 1rem;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes tiktok-marquee-x {
+    0% {
+      transform: translateX(0);
+    }
+    100% {
+      transform: translateX(-50%);
+    }
+  }
+
+  .track {
+    animation-name: tiktok-marquee-x;
+    animation-duration: 48s;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .track {
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 100%;
+    max-width: 72rem;
+    margin-inline: auto;
+    row-gap: 1rem;
+  }
+}
+
+.fadeLeft {
+  background: linear-gradient(
+    to right,
+    var(--os-bg) 0%,
+    color-mix(in srgb, var(--os-bg) 85%, transparent) 35%,
+    color-mix(in srgb, var(--os-bg) 35%, transparent) 65%,
+    transparent 100%
+  );
+}
+
+.fadeRight {
+  background: linear-gradient(
+    to left,
+    var(--os-bg) 0%,
+    color-mix(in srgb, var(--os-bg) 85%, transparent) 35%,
+    color-mix(in srgb, var(--os-bg) 35%, transparent) 65%,
+    transparent 100%
+  );
+}

@@ -1,0 +1,2046 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>MOS — Agent Visualizer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg: #0a0a0a;
+    --bg-elev: #111111;
+    --bg-elev-2: #181818;
+    --console-bg: #0c0c0c;
+    --line: rgba(255,255,255,0.06);
+    --line-strong: rgba(255,255,255,0.12);
+    --text: #e8e8e6;
+    --text-dim: #9a9a93;
+    --text-faint: #5a5a55;
+    --accent: #E07A5F;
+    --accent-soft: rgba(224,122,95,0.16);
+    --ok: #8be38b;
+    --ok-soft: rgba(139,227,139,0.22);
+    --warn: #e6b85c;
+    --err:  #e26d6d;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:'Inter',ui-sans-serif,system-ui,-apple-system,sans-serif;
+    overflow:hidden;height:100vh;width:100vw;
+    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  #root{position:fixed;inset:0}
+  .mono{font-family:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;
+    font-feature-settings:"calt" 0,"liga" 0}
+
+  /* stage */
+  .stage{position:absolute;inset:0;overflow:hidden}
+  .stage svg{display:block;width:100%;height:100%;cursor:grab}
+  .stage svg.dragging{cursor:grabbing}
+
+  /* grid backdrop */
+  .bg-grid{position:absolute;inset:0;pointer-events:none;
+    background-image:
+      radial-gradient(circle at 50% 40%, rgba(224,122,95,0.06), transparent 55%),
+      linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: auto, 48px 48px, 48px 48px;
+    background-position: 0 0, 0 0, 0 0;
+    mask-image: radial-gradient(circle at 50% 45%, black 30%, transparent 85%);
+  }
+  .vignette{position:absolute;inset:0;pointer-events:none;
+    background: radial-gradient(circle at 50% 50%, transparent 40%, rgba(0,0,0,0.55) 100%)}
+
+  /* overlay frame */
+  .frame{position:absolute;inset:0;pointer-events:none;z-index:5}
+  .frame > *{pointer-events:auto}
+
+  /* top bar */
+  .topbar{position:absolute;top:0;left:0;right:0;height:48px;
+    display:flex;align-items:center;gap:0;
+    padding:0 16px;
+    border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg, rgba(10,10,10,0.92), rgba(10,10,10,0.72) 70%, transparent);
+    backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    font-size:12px;color:var(--text-dim);}
+  .brand{display:flex;align-items:center;gap:10px;color:var(--text);
+    padding-right:18px;margin-right:18px;border-right:1px solid var(--line)}
+  .brand-mark{width:18px;height:18px;border-radius:5px;
+    background: conic-gradient(from 220deg, var(--accent), #c95d44 30%, #2a2a2a 60%, var(--accent) 100%);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1), 0 0 12px rgba(224,122,95,0.45);}
+  .brand-name{font-weight:600;letter-spacing:0.02em;color:var(--text);font-size:13px}
+  .brand-sub{color:var(--text-faint);font-size:11px;margin-left:2px}
+
+  .tabs{display:flex;gap:2px;height:100%;align-items:center}
+  .tab{height:28px;padding:0 12px;border-radius:6px;display:flex;align-items:center;gap:6px;
+    color:var(--text-dim);cursor:default;font-size:12px}
+  .tab.active{background:var(--bg-elev-2);color:var(--text)}
+  .tab .dot{width:5px;height:5px;border-radius:50%;background:var(--text-faint)}
+  .tab.active .dot{background:var(--ok);box-shadow:0 0 8px var(--ok-soft)}
+
+  .topbar-right{margin-left:auto;display:flex;align-items:center;gap:14px;font-size:11px}
+  .top-stat{display:flex;align-items:center;gap:6px;color:var(--text-dim)}
+  .top-stat b{color:var(--text);font-weight:500;font-variant-numeric:tabular-nums}
+  .pill{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 8px;
+    border:1px solid var(--line-strong);border-radius:11px;color:var(--text-dim);font-size:11px}
+  .pill .pulse{width:6px;height:6px;border-radius:50%;background:var(--ok);
+    box-shadow:0 0 8px var(--ok); animation:pulse 1.6s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.85)}}
+
+  /* left rail */
+  .leftrail{position:absolute;top:64px;bottom:280px;left:16px;width:60px;
+    background:var(--bg-elev);border:1px solid var(--line);border-radius:12px;
+    display:flex;flex-direction:column;align-items:center;padding:10px 0;gap:4px;
+    z-index:6}
+  .rail-btn{width:42px;height:42px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+    color:var(--text-dim);position:relative;cursor:default}
+  .rail-btn:hover{background:var(--bg-elev-2);color:var(--text)}
+  .rail-btn.active{background:var(--accent-soft);color:var(--accent)}
+  .rail-btn svg{width:18px;height:18px}
+  .rail-divider{width:30px;height:1px;background:var(--line);margin:6px 0}
+  .rail-btn .tip{position:absolute;left:54px;top:50%;transform:translateY(-50%);
+    background:#1a1a1a;color:var(--text);padding:4px 8px;border-radius:6px;font-size:11px;
+    border:1px solid var(--line-strong);white-space:nowrap;opacity:0;pointer-events:none;
+    transition:opacity .12s ease;z-index:10}
+  .rail-btn:hover .tip{opacity:1}
+
+  /* right detail panel */
+  .detail{position:absolute;top:64px;bottom:280px;right:16px;width:320px;
+    background:var(--bg-elev);border:1px solid var(--line);border-radius:12px;
+    display:flex;flex-direction:column;overflow:hidden;z-index:6}
+  .detail-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:8px;color:var(--text-faint);padding:24px;text-align:center}
+  .detail-empty .ico{width:28px;height:28px;border:1px dashed var(--line-strong);border-radius:8px;
+    display:flex;align-items:center;justify-content:center;color:var(--text-faint);font-size:14px;margin-bottom:6px}
+  .detail-empty p{margin:0;font-size:12px;line-height:1.5}
+  .detail-empty small{color:var(--text-faint);font-size:11px}
+  .detail-hd{padding:14px 16px 12px;border-bottom:1px solid var(--line)}
+  .detail-hd-row{display:flex;align-items:center;gap:10px}
+  .agent-glyph{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+    font-weight:600;font-size:13px;letter-spacing:0.02em;flex-shrink:0;
+    background:var(--bg-elev-2);border:1px solid var(--line-strong);color:var(--text)}
+  .detail-hd h3{margin:0;font-size:14px;font-weight:600;letter-spacing:-0.005em}
+  .detail-hd .role{color:var(--text-dim);font-size:11px;margin-top:2px;letter-spacing:0.02em}
+  .status-row{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
+  .status-chip{display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 7px;border-radius:4px;
+    font-size:10.5px;font-weight:500;letter-spacing:0.02em;text-transform:uppercase;
+    background:var(--bg-elev-2);color:var(--text-dim)}
+  .status-chip.active{background:var(--ok-soft);color:#aaedaa}
+  .status-chip.waiting{background:rgba(230,184,92,0.18);color:#f0cf85}
+  .status-chip.idle{background:var(--bg-elev-2);color:var(--text-faint)}
+  .status-chip.err{background:rgba(226,109,109,0.18);color:#f29696}
+  .status-chip .d{width:5px;height:5px;border-radius:50%;background:currentColor}
+
+  .detail-body{flex:1;overflow-y:auto;padding:6px 0}
+  .detail-body::-webkit-scrollbar{width:6px}
+  .detail-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.08);border-radius:3px}
+
+  .section{padding:14px 16px;border-bottom:1px solid var(--line)}
+  .section:last-child{border-bottom:none}
+  .section-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .section-title{font-size:10.5px;font-weight:600;letter-spacing:0.08em;
+    text-transform:uppercase;color:var(--text-faint)}
+
+  .task{background:var(--bg-elev-2);border:1px solid var(--line);border-radius:8px;
+    padding:10px 11px;font-size:12px;color:var(--text)}
+  .task .t-head{display:flex;align-items:center;gap:6px;color:var(--text-dim);font-size:10.5px;
+    margin-bottom:6px;text-transform:uppercase;letter-spacing:0.06em}
+  .task .t-head .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);
+    box-shadow:0 0 8px var(--accent-soft)}
+  .task p{margin:0;line-height:1.45;color:var(--text)}
+  .task .progress{margin-top:9px;height:3px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden}
+  .task .progress > div{height:100%;background:var(--accent);transition:width .6s linear}
+
+  .kv{display:grid;grid-template-columns:90px 1fr;gap:6px 12px;font-size:11.5px}
+  .kv dt{color:var(--text-faint);letter-spacing:0.02em}
+  .kv dd{margin:0;color:var(--text)}
+  .kv dd.mono{font-size:11px;color:var(--text-dim)}
+
+  .neighbors{display:flex;flex-direction:column;gap:4px}
+  .neighbor{display:flex;align-items:center;gap:8px;padding:6px 6px;border-radius:6px;cursor:default}
+  .neighbor:hover{background:var(--bg-elev-2)}
+  .neighbor .nm{font-size:12px;color:var(--text);flex:1}
+  .neighbor .role{font-size:10.5px;color:var(--text-faint)}
+  .neighbor .arrow{color:var(--text-faint);font-size:11px}
+
+  .tools{display:flex;flex-wrap:wrap;gap:5px}
+  .tool-chip{font-size:10.5px;padding:3px 7px;border:1px solid var(--line);border-radius:4px;
+    color:var(--text-dim);background:var(--bg-elev-2)}
+
+  /* console */
+  .console{position:absolute;left:16px;right:16px;bottom:16px;height:248px;
+    background:var(--console-bg);border:1px solid var(--line);border-radius:12px;
+    display:flex;flex-direction:column;overflow:hidden;z-index:6}
+  .console-hd{display:flex;align-items:center;gap:14px;padding:10px 14px;
+    border-bottom:1px solid var(--line);font-size:11px;color:var(--text-dim)}
+  .console-hd .title{display:flex;align-items:center;gap:8px;color:var(--text);font-weight:500}
+  .console-hd .title .d{width:6px;height:6px;border-radius:50%;background:var(--ok);
+    box-shadow:0 0 8px var(--ok);animation:pulse 1.6s ease-in-out infinite}
+  .filter-tabs{display:flex;gap:2px;margin-left:auto}
+  .ftab{font-size:11px;padding:4px 9px;border-radius:5px;color:var(--text-dim);cursor:default;
+    display:inline-flex;align-items:center;gap:6px}
+  .ftab.active{background:var(--bg-elev-2);color:var(--text)}
+  .ftab .c{font-variant-numeric:tabular-nums;color:var(--text-faint);font-size:10.5px}
+  .ftab.active .c{color:var(--text-dim)}
+
+  .console-body{flex:1;overflow-y:auto;padding:6px 0;font-family:'JetBrains Mono',ui-monospace,monospace;
+    font-size:11.5px;line-height:1.6}
+  .console-body::-webkit-scrollbar{width:8px}
+  .console-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.08);border-radius:4px}
+
+  .evt{padding:2px 14px;display:grid;grid-template-columns:64px 100px 1fr;gap:14px;
+    align-items:baseline;color:var(--text-dim)}
+  .evt:hover{background:rgba(255,255,255,0.025)}
+  .evt .ts{color:var(--text-faint);font-size:10.5px}
+  .evt .agent{color:var(--text);font-weight:500;font-size:11px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .evt .msg{color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .evt .lvl{color:var(--text-faint);font-size:10.5px;margin-right:6px}
+  .evt.info .lvl{color:#7ec5ff}
+  .evt.ok .lvl{color:var(--ok)}
+  .evt.warn .lvl{color:var(--warn)}
+  .evt.err .lvl{color:var(--err)}
+  .evt.tool .lvl{color:#c89cff}
+  .evt .arg{color:var(--text);}
+  .evt .arrow{color:var(--text-faint);margin:0 4px}
+
+  /* stats overlay (bottom-left of stage) */
+  .stat-overlay{position:absolute;left:92px;top:64px;display:flex;flex-direction:column;gap:8px;z-index:6}
+  .stat-card{background:rgba(17,17,17,0.78);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:148px}
+  .stat-card .lbl{font-size:10px;letter-spacing:0.08em;text-transform:uppercase;
+    color:var(--text-faint);margin-bottom:4px}
+  .stat-card .val{font-size:20px;font-weight:600;letter-spacing:-0.01em;
+    font-variant-numeric:tabular-nums;color:var(--text);display:flex;align-items:baseline;gap:6px}
+  .stat-card .val small{font-size:11px;color:var(--text-dim);font-weight:400}
+  .stat-card .spark{margin-top:8px;height:24px;display:flex;align-items:flex-end;gap:2px}
+  .stat-card .spark span{flex:1;background:var(--accent);opacity:0.6;border-radius:1px;min-height:1px}
+
+  /* command palette / new agent input */
+  .commander{position:absolute;left:50%;transform:translateX(-50%);top:64px;width:520px;z-index:7;
+    background:rgba(17,17,17,0.86);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border:1px solid var(--line-strong);border-radius:10px;
+    display:flex;align-items:center;gap:8px;padding:0 12px;height:38px;
+    box-shadow:0 8px 28px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.04)}
+  .commander .prompt{color:var(--accent);font-family:'JetBrains Mono',monospace;font-size:12px}
+  .commander input{flex:1;background:transparent;border:0;outline:none;color:var(--text);
+    font-family:'JetBrains Mono',monospace;font-size:12.5px;letter-spacing:0.005em}
+  .commander input::placeholder{color:var(--text-faint)}
+  .commander .hint{font-size:10.5px;color:var(--text-faint);display:flex;gap:6px;align-items:center}
+  .kbd{font-family:'JetBrains Mono',monospace;font-size:10px;padding:1px 5px;border-radius:3px;
+    border:1px solid var(--line-strong);color:var(--text-dim);background:rgba(255,255,255,0.03)}
+
+  /* legend */
+  .legend{position:absolute;bottom:280px;left:92px;margin-bottom:14px;
+    background:rgba(17,17,17,0.78);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    border:1px solid var(--line);border-radius:10px;padding:10px 12px;z-index:6;
+    display:flex;flex-direction:column;gap:6px;font-size:11px;color:var(--text-dim)}
+  .legend .row{display:flex;align-items:center;gap:8px}
+  .legend .sw{width:12px;height:12px;border-radius:3px}
+  .legend .ln{width:22px;height:0;border-top:1.5px solid var(--text-faint)}
+  .legend .ln.dashed{border-top-style:dashed}
+
+  /* zoom controls */
+  .zoom{position:absolute;right:352px;bottom:296px;display:flex;flex-direction:column;gap:1px;z-index:6;
+    background:var(--bg-elev);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .zoom button{width:32px;height:32px;background:transparent;border:0;color:var(--text-dim);
+    font-size:14px;cursor:default;border-bottom:1px solid var(--line)}
+  .zoom button:last-child{border-bottom:0}
+  .zoom button:hover{background:var(--bg-elev-2);color:var(--text)}
+
+  /* node tooltips */
+  .ntip{position:absolute;background:#1a1a1a;border:1px solid var(--line-strong);
+    border-radius:6px;padding:6px 9px;font-size:11px;color:var(--text);pointer-events:none;
+    box-shadow:0 6px 20px rgba(0,0,0,0.5);transform:translate(-50%,-110%);z-index:8;white-space:nowrap}
+  .ntip .role{color:var(--text-faint);font-size:10px;margin-top:2px}
+
+  /* small util */
+  .row-h{display:flex;align-items:center;gap:8px}
+  .spacer{flex:1}
+  .btn-ghost{background:transparent;border:1px solid var(--line-strong);color:var(--text-dim);
+    border-radius:6px;padding:4px 8px;font-size:11px;cursor:default}
+  .btn-ghost:hover{color:var(--text);background:var(--bg-elev-2)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" data-presets="react">
+/* ===== agent-data.jsx ===== */
+// agent-data.jsx — mock agent definitions, relationships, and event stream
+
+const AGENT_ROLES = {
+  orchestrator: { label: "Orchestrator", color: "#E07A5F" },
+  retriever:    { label: "Retriever",    color: "#7ec5ff" },
+  reasoner:     { label: "Reasoner",     color: "#c89cff" },
+  executor:     { label: "Executor",     color: "#8be38b" },
+  sentinel:     { label: "Sentinel",     color: "#e6b85c" },
+  scribe:       { label: "Scribe",       color: "#9a9a93" },
+};
+
+// Seed roster — names lean monospace/codename to fit the OS aesthetic
+const AGENTS = [
+  { id: "kernel",     name: "kernel",     glyph: "K",  role: "orchestrator", status: "active",
+    task: "Routing user request through capability graph",
+    progress: 0.62, tokens: 184213, cost: 1.84, runtime: "00:14:22",
+    model: "claude-opus-4.5", tools: ["dispatch", "trace", "budget"],
+    pos: { x: 0, y: 0 }, pinned: true },
+
+  { id: "atlas",      name: "atlas",      glyph: "A",  role: "retriever",   status: "active",
+    task: "Crawling vector index • shard 3/8",
+    progress: 0.41, tokens: 92110,  cost: 0.31, runtime: "00:08:11",
+    model: "haiku-4.5", tools: ["search.web", "search.local", "embed"] },
+
+  { id: "scout",      name: "scout",      glyph: "S",  role: "retriever",   status: "waiting",
+    task: "Awaiting credentials for github://acme",
+    progress: 0.18, tokens: 31002,  cost: 0.09, runtime: "00:02:48",
+    model: "haiku-4.5", tools: ["github.read", "fs.read", "grep"] },
+
+  { id: "loom",       name: "loom",       glyph: "L",  role: "reasoner",    status: "active",
+    task: "Synthesizing draft response from 12 sources",
+    progress: 0.74, tokens: 220488, cost: 2.15, runtime: "00:11:03",
+    model: "claude-sonnet-4.5", tools: ["plan", "critique", "write"] },
+
+  { id: "praxis",     name: "praxis",     glyph: "P",  role: "reasoner",    status: "active",
+    task: "Evaluating tradeoffs across 4 strategies",
+    progress: 0.55, tokens: 71290,  cost: 0.66, runtime: "00:05:31",
+    model: "claude-sonnet-4.5", tools: ["plan", "score", "vote"] },
+
+  { id: "forge",      name: "forge",      glyph: "F",  role: "executor",    status: "active",
+    task: "Running test suite (pkg/auth) — 142/210",
+    progress: 0.68, tokens: 11820,  cost: 0.04, runtime: "00:01:54",
+    model: "haiku-4.5", tools: ["shell", "fs.write", "git"] },
+
+  { id: "anvil",      name: "anvil",      glyph: "Λ",  role: "executor",    status: "idle",
+    task: "—",
+    progress: 0,    tokens: 0,      cost: 0,    runtime: "00:00:00",
+    model: "haiku-4.5", tools: ["shell", "docker", "k8s"] },
+
+  { id: "ledger",     name: "ledger",     glyph: "$",  role: "sentinel",    status: "active",
+    task: "Enforcing $25/hr budget — 41% used",
+    progress: 0.41, tokens: 4109,   cost: 0.01, runtime: "00:14:22",
+    model: "haiku-4.5", tools: ["budget", "alert", "halt"] },
+
+  { id: "warden",     name: "warden",     glyph: "W",  role: "sentinel",    status: "active",
+    task: "Scanning tool calls for policy violations",
+    progress: 0.99, tokens: 9012,   cost: 0.02, runtime: "00:14:22",
+    model: "haiku-4.5", tools: ["policy", "approve", "deny"] },
+
+  { id: "harbor",     name: "harbor",     glyph: "H",  role: "sentinel",    status: "err",
+    task: "Rate limit hit on api.notion.com — backing off 28s",
+    progress: 0.12, tokens: 220,    cost: 0.00, runtime: "00:00:34",
+    model: "haiku-4.5", tools: ["http", "auth", "retry"] },
+
+  { id: "echo",       name: "echo",       glyph: "E",  role: "scribe",      status: "active",
+    task: "Streaming trace to ~/.mos/runs/2026-05-11T14-22.jsonl",
+    progress: 0.81, tokens: 152340, cost: 0.05, runtime: "00:14:22",
+    model: "haiku-4.5", tools: ["fs.write", "stream", "compress"] },
+
+  { id: "mosaic",     name: "mosaic",     glyph: "M",  role: "scribe",      status: "waiting",
+    task: "Holding rollup until kernel signals completion",
+    progress: 0.20, tokens: 8420,   cost: 0.01, runtime: "00:14:22",
+    model: "haiku-4.5", tools: ["summarize", "diff", "report"] },
+];
+
+// Directed edges = delegation / data flow. weight ~ traffic.
+const EDGES = [
+  // kernel orchestrates everything
+  ["kernel", "atlas",   0.9],
+  ["kernel", "scout",   0.4],
+  ["kernel", "loom",    0.95],
+  ["kernel", "praxis",  0.7],
+  ["kernel", "forge",   0.8],
+  ["kernel", "anvil",   0.1],
+  ["kernel", "echo",    1.0],
+  ["kernel", "ledger",  0.6],
+  ["kernel", "warden",  0.6],
+  // retrievers feed reasoners
+  ["atlas",  "loom",    0.85],
+  ["scout",  "loom",    0.3],
+  ["atlas",  "praxis",  0.4],
+  // reasoners hand off to executors
+  ["loom",   "forge",   0.55],
+  ["praxis", "forge",   0.45],
+  ["praxis", "anvil",   0.15],
+  // sentinels watch everyone
+  ["warden", "forge",   0.3],
+  ["warden", "anvil",   0.2],
+  ["ledger", "loom",    0.25],
+  ["ledger", "atlas",   0.2],
+  // harbor mediates external
+  ["harbor", "atlas",   0.4],
+  ["harbor", "scout",   0.3],
+  // scribes collect
+  ["loom",   "mosaic",  0.5],
+  ["forge",  "echo",    0.6],
+  ["atlas",  "echo",    0.5],
+];
+
+// Pre-canned event templates used by the live ticker
+const EVENT_TEMPLATES = [
+  { lvl: "info", agent: "kernel", msg: ["dispatch →", "atlas",   "query.semantic(\"oauth refresh flow\")"] },
+  { lvl: "tool", agent: "atlas",  msg: ["search.local", "→", "hit 14 / 3.2k chunks  (412ms)"] },
+  { lvl: "tool", agent: "atlas",  msg: ["embed", "→", "batch=32  model=nomic-v2  (188ms)"] },
+  { lvl: "info", agent: "loom",   msg: ["plan", "→", "draft 3 candidate responses, then critique"] },
+  { lvl: "ok",   agent: "loom",   msg: ["complete", "step 2/5", "synthesis ok  (1.4s)"] },
+  { lvl: "tool", agent: "forge",  msg: ["shell", "→", "pnpm test --filter pkg/auth"] },
+  { lvl: "ok",   agent: "forge",  msg: ["test passed", "auth.spec.ts", "142/210"] },
+  { lvl: "warn", agent: "ledger", msg: ["budget", "→", "41% of $25/hr cap used in 14m"] },
+  { lvl: "info", agent: "warden", msg: ["policy.check", "fs.write", "approved → ~/projects/acme"] },
+  { lvl: "warn", agent: "warden", msg: ["policy.check", "shell", "denied → rm -rf /"] },
+  { lvl: "err",  agent: "harbor", msg: ["429", "api.notion.com", "rate limit  retry in 28s"] },
+  { lvl: "info", agent: "scout",  msg: ["awaiting", "github://acme", "credentials prompt sent to user"] },
+  { lvl: "tool", agent: "praxis", msg: ["score", "→", "candidate A=0.81  B=0.74  C=0.69  D=0.52"] },
+  { lvl: "ok",   agent: "praxis", msg: ["vote", "→", "selected candidate A"] },
+  { lvl: "info", agent: "echo",   msg: ["stream", "→", "+1.2 MB → runs/2026-05-11T14-22.jsonl"] },
+  { lvl: "tool", agent: "mosaic", msg: ["summarize", "→", "rollup queued until kernel.done"] },
+  { lvl: "info", agent: "kernel", msg: ["delegate →", "praxis", "evaluate(strategies=4)"] },
+  { lvl: "ok",   agent: "atlas",  msg: ["complete", "shard 3/8", "→ loom (124 chunks)"] },
+];
+
+// Seed history (most-recent-last)
+const SEED_EVENTS = [
+  "kernel.boot  v0.42.1  pid=24811",
+  "kernel.load  manifest=mos.toml  (12 agents)",
+  "kernel.start trace.id=run_4f2a91",
+  ...Array.from({length: 22}, () => null),
+].map((s, i) => {
+  if (typeof s === "string") {
+    return { id: i, ts: fmtTs(-32 + i), lvl: "info", agent: "kernel",
+             parts: [s], boot: true };
+  }
+  const tpl = EVENT_TEMPLATES[i % EVENT_TEMPLATES.length];
+  return { id: i, ts: fmtTs(-32 + i), lvl: tpl.lvl, agent: tpl.agent, parts: tpl.msg };
+});
+
+function fmtTs(deltaSec) {
+  // returns HH:MM:SS relative to "now-fixed" 14:22:00
+  const base = 14*3600 + 22*60;
+  const t = base + deltaSec;
+  const h = Math.floor(t/3600), m = Math.floor((t%3600)/60), s = t%60;
+  return [h,m,s].map(n => String(n).padStart(2,"0")).join(":");
+}
+
+function makeEvent(id, agentId) {
+  // produce a fresh event roughly themed for the agent
+  const pool = EVENT_TEMPLATES.filter(e => !agentId || e.agent === agentId);
+  const tpl = pool[Math.floor(Math.random() * pool.length)] || EVENT_TEMPLATES[0];
+  const base = 14*3600 + 22*60 + Math.floor(Math.random()*200);
+  const h = Math.floor(base/3600), m = Math.floor((base%3600)/60), s = base%60;
+  const ts = [h,m,s].map(n=>String(n).padStart(2,"0")).join(":");
+  return { id, ts, lvl: tpl.lvl, agent: tpl.agent, parts: tpl.msg };
+}
+
+Object.assign(window, {
+  AGENT_ROLES, AGENTS, EDGES, EVENT_TEMPLATES, SEED_EVENTS, makeEvent, fmtTs,
+});
+
+</script>
+
+<script type="text/babel" data-presets="react">
+/* ===== agent-sim.jsx ===== */
+// agent-sim.jsx — tiny force-directed layout + traffic pulse generator
+
+const { useRef, useEffect, useState, useMemo, useCallback } = React;
+
+// Run a few seeded ticks before mount so the graph appears settled, then keep
+// ticking gently to give the mesh life.
+function useForceLayout(agents, edges, opts = {}) {
+  const { width = 1200, height = 700, charge = -2400, link = 180, gravity = 0.05 } = opts;
+
+  // build mutable node array once per agents identity
+  const nodes = useRef(null);
+  const links = useRef(null);
+  const [, force] = useState(0); // trigger render
+  const tickRef = useRef(0);
+  const draggingRef = useRef(null);
+
+  if (!nodes.current || nodes.current.length !== agents.length) {
+    // seed positions in a rough ring with kernel pinned at center
+    const n = agents.length;
+    nodes.current = agents.map((a, i) => {
+      if (a.pinned) {
+        return { id: a.id, x: width/2, y: height/2, vx: 0, vy: 0, fixed: true };
+      }
+      const ang = (i / n) * Math.PI * 2;
+      const r = Math.min(width, height) * 0.32;
+      return {
+        id: a.id,
+        x: width/2 + Math.cos(ang) * r + (Math.random()-0.5)*40,
+        y: height/2 + Math.sin(ang) * r + (Math.random()-0.5)*40,
+        vx: 0, vy: 0, fixed: false,
+      };
+    });
+  }
+  if (!links.current) {
+    const idx = Object.fromEntries(agents.map((a,i)=>[a.id,i]));
+    links.current = edges.map(([a,b,w]) => ({ s: idx[a], t: idx[b], w }));
+  }
+
+  // single tick
+  const step = useCallback((dt = 1) => {
+    const ns = nodes.current, ls = links.current;
+    const cx = width / 2, cy = height / 2;
+    // repulsion (O(n^2) — fine for ~20 nodes)
+    for (let i=0;i<ns.length;i++){
+      for (let j=i+1;j<ns.length;j++){
+        const a = ns[i], b = ns[j];
+        let dx = b.x - a.x, dy = b.y - a.y;
+        let d2 = dx*dx + dy*dy;
+        if (d2 < 0.01) { dx = Math.random()-0.5; dy = Math.random()-0.5; d2 = 1; }
+        const d = Math.sqrt(d2);
+        const f = charge / d2;
+        const fx = (dx/d) * f, fy = (dy/d) * f;
+        a.vx -= fx; a.vy -= fy;
+        b.vx += fx; b.vy += fy;
+      }
+    }
+    // spring links
+    for (const l of ls) {
+      const a = ns[l.s], b = ns[l.t];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const d = Math.sqrt(dx*dx + dy*dy) || 1;
+      const desired = link;
+      const f = (d - desired) * 0.04 * (0.3 + l.w * 0.7);
+      const fx = (dx/d) * f, fy = (dy/d) * f;
+      a.vx += fx; a.vy += fy;
+      b.vx -= fx; b.vy -= fy;
+    }
+    // gravity to center
+    for (const n of ns) {
+      n.vx += (cx - n.x) * gravity * 0.02;
+      n.vy += (cy - n.y) * gravity * 0.02;
+    }
+    // integrate + damp
+    for (const n of ns) {
+      if (n.fixed) { n.vx = n.vy = 0; n.x = cx; n.y = cy; continue; }
+      if (draggingRef.current === n.id) { n.vx = n.vy = 0; continue; }
+      n.vx *= 0.78; n.vy *= 0.78;
+      n.x += n.vx * dt;
+      n.y += n.vy * dt;
+    }
+    tickRef.current++;
+  }, [width, height, charge, link, gravity]);
+
+  // pre-settle once
+  const seededRef = useRef(false);
+  if (!seededRef.current) {
+    for (let i=0;i<260;i++) step(1);
+    seededRef.current = true;
+  }
+
+  // animation loop
+  useEffect(() => {
+    let raf;
+    const loop = () => {
+      step(0.6);
+      force(t => t + 1);
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [step]);
+
+  return {
+    nodes: nodes.current,
+    links: links.current,
+    setDrag: (id) => { draggingRef.current = id; },
+    moveDrag: (id, x, y) => {
+      const n = nodes.current.find(n => n.id === id);
+      if (n) { n.x = x; n.y = y; n.vx = n.vy = 0; }
+    },
+  };
+}
+
+// Pulse generator — emits short "packets" traveling from src to tgt along a link.
+// Pulses are stored in a ref + rendered on RAF for buttery motion.
+function useTraffic(links, agents, agentMap, opts = {}) {
+  const { rate = 1.6, speed = 0.0009 } = opts; // packets/sec, progress/ms
+  const pulses = useRef([]); // { linkIdx, t, lvl }
+  const [, force] = useState(0);
+  const lastSpawn = useRef(performance.now());
+
+  useEffect(() => {
+    let raf;
+    const tick = () => {
+      const now = performance.now();
+      // spawn
+      const interval = 1000 / rate;
+      while (now - lastSpawn.current > interval) {
+        lastSpawn.current += interval;
+        // pick a link weighted by its weight × source-agent activity
+        const candidates = links.map((l, i) => {
+          const src = agents[l.s];
+          const a = agentMap[src.id];
+          const mult = a.status === "active" ? 1 : a.status === "waiting" ? 0.2 : a.status === "err" ? 0.1 : 0;
+          return { i, w: l.w * mult };
+        });
+        const total = candidates.reduce((s,c)=>s+c.w, 0);
+        if (total <= 0) break;
+        let r = Math.random() * total;
+        let pick = candidates[0];
+        for (const c of candidates) { r -= c.w; if (r <= 0) { pick = c; break; } }
+        const lvls = ["info","info","info","tool","ok","ok","warn","err"];
+        const a = agentMap[agents[links[pick.i].s].id];
+        const lvl = a.status === "err" ? "err" : lvls[Math.floor(Math.random()*lvls.length)];
+        pulses.current.push({ linkIdx: pick.i, t: 0, lvl, born: now });
+        if (pulses.current.length > 80) pulses.current.shift();
+      }
+      // advance
+      const dt = 16; // assume ~60fps
+      pulses.current = pulses.current.filter(p => {
+        p.t += speed * dt;
+        return p.t < 1.02;
+      });
+      force(t => t + 1);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [links, agents, agentMap, rate, speed]);
+
+  return pulses.current;
+}
+
+// Rolling event ticker — appends synthetic events on a cadence
+function useEventStream(seed, agents, agentMap, opts = {}) {
+  const { rate = 1.4 } = opts; // events / sec
+  const [events, setEvents] = useState(seed);
+  const nextId = useRef(seed.length);
+
+  useEffect(() => {
+    let alive = true;
+    const tick = () => {
+      if (!alive) return;
+      // pick an agent that's active or waiting
+      const active = agents.filter(a => {
+        const s = agentMap[a.id].status;
+        return s === "active" || s === "waiting" || s === "err";
+      });
+      const target = active[Math.floor(Math.random()*active.length)];
+      const ev = makeEvent(nextId.current++, target?.id);
+      setEvents(es => {
+        const next = [...es, ev];
+        return next.length > 220 ? next.slice(next.length - 220) : next;
+      });
+      const jitter = (0.5 + Math.random()) * (1000 / rate);
+      setTimeout(tick, jitter);
+    };
+    const id = setTimeout(tick, 1000 / rate);
+    return () => { alive = false; clearTimeout(id); };
+  }, [agents, agentMap, rate]);
+
+  return events;
+}
+
+Object.assign(window, { useForceLayout, useTraffic, useEventStream });
+
+</script>
+
+<script type="text/babel" data-presets="react">
+/* ===== agent-graph.jsx ===== */
+// agent-graph.jsx — SVG force graph view: nodes, edges, pulses
+
+const { useRef: useRefG, useEffect: useEffectG, useState: useStateG, useMemo: useMemoG } = React;
+
+function AgentGraph({ agents, agentMap, edges, selected, onSelect, dims, showLabels = true, edgeMode = "curved" }) {
+  const { width, height } = dims;
+  const { nodes, links, setDrag, moveDrag } = useForceLayout(agents, edges, { width, height });
+  const pulses = useTraffic(links, agents, agentMap, { rate: 2.6, speed: 0.0011 });
+
+  const svgRef = useRefG(null);
+  const [hover, setHover] = useStateG(null);
+  const [dragging, setDragging] = useStateG(null);
+  const [view, setView] = useStateG({ x: 0, y: 0, k: 1 }); // pan/zoom
+  const panState = useRefG(null);
+
+  // helper: screen px → svg coord (account for pan/zoom)
+  const toSvg = (clientX, clientY) => {
+    const r = svgRef.current.getBoundingClientRect();
+    const sx = (clientX - r.left);
+    const sy = (clientY - r.top);
+    return { x: (sx - view.x) / view.k, y: (sy - view.y) / view.k };
+  };
+
+  // node drag
+  const onNodeDown = (e, id) => {
+    e.stopPropagation();
+    setDragging(id);
+    setDrag(id);
+  };
+  useEffectG(() => {
+    if (!dragging && !panState.current) return;
+    const onMove = (e) => {
+      if (dragging) {
+        const p = toSvg(e.clientX, e.clientY);
+        moveDrag(dragging, p.x, p.y);
+      } else if (panState.current) {
+        const dx = e.clientX - panState.current.x0;
+        const dy = e.clientY - panState.current.y0;
+        setView(v => ({ ...v, x: panState.current.vx0 + dx, y: panState.current.vy0 + dy }));
+      }
+    };
+    const onUp = () => {
+      if (dragging) { setDrag(null); setDragging(null); }
+      panState.current = null;
+      if (svgRef.current) svgRef.current.classList.remove("dragging");
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  });
+
+  const onBgDown = (e) => {
+    panState.current = { x0: e.clientX, y0: e.clientY, vx0: view.x, vy0: view.y };
+    if (svgRef.current) svgRef.current.classList.add("dragging");
+  };
+  const onWheel = (e) => {
+    e.preventDefault();
+    const factor = Math.exp(-e.deltaY * 0.0015);
+    setView(v => {
+      const k2 = Math.max(0.4, Math.min(2.4, v.k * factor));
+      const r = svgRef.current.getBoundingClientRect();
+      const mx = e.clientX - r.left, my = e.clientY - r.top;
+      // zoom toward cursor
+      const x = mx - (mx - v.x) * (k2 / v.k);
+      const y = my - (my - v.y) * (k2 / v.k);
+      return { x, y, k: k2 };
+    });
+  };
+  // expose zoom controls
+  useEffectG(() => {
+    window.__zoom = {
+      in:   () => setView(v => ({ ...v, k: Math.min(2.4, v.k * 1.2) })),
+      out:  () => setView(v => ({ ...v, k: Math.max(0.4, v.k / 1.2) })),
+      home: () => setView({ x: 0, y: 0, k: 1 }),
+    };
+  }, []);
+
+  // selected neighborhood (1-hop) for emphasis
+  const highlighted = useMemoG(() => {
+    if (!selected && !hover) return null;
+    const id = selected || hover;
+    const set = new Set([id]);
+    for (const [a,b] of edges) {
+      if (a === id) set.add(b);
+      if (b === id) set.add(a);
+    }
+    return set;
+  }, [selected, hover, edges]);
+
+  // ── render helpers
+  const linkPath = (a, b) => {
+    if (edgeMode === "straight") return `M ${a.x} ${a.y} L ${b.x} ${b.y}`;
+    const mx = (a.x + b.x)/2, my = (a.y + b.y)/2;
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len = Math.sqrt(dx*dx + dy*dy) || 1;
+    // perpendicular offset for slight curve
+    const off = Math.min(40, len * 0.12);
+    const px = mx - (dy/len) * off;
+    const py = my + (dx/len) * off;
+    return `M ${a.x} ${a.y} Q ${px} ${py} ${b.x} ${b.y}`;
+  };
+  const linkPoint = (a, b, t) => {
+    if (edgeMode === "straight") {
+      return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+    }
+    const mx = (a.x + b.x)/2, my = (a.y + b.y)/2;
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len = Math.sqrt(dx*dx + dy*dy) || 1;
+    const off = Math.min(40, len * 0.12);
+    const px = mx - (dy/len) * off;
+    const py = my + (dx/len) * off;
+    const u = 1 - t;
+    return {
+      x: u*u*a.x + 2*u*t*px + t*t*b.x,
+      y: u*u*a.y + 2*u*t*py + t*t*b.y,
+    };
+  };
+
+  const pulseColor = (lvl) => ({
+    info: "#7ec5ff", ok: "#8be38b", warn: "#e6b85c", err: "#e26d6d", tool: "#c89cff",
+  }[lvl] || "#e8e8e6");
+
+  return (
+    <div className="stage">
+      <div className="bg-grid"></div>
+      <div className="vignette"></div>
+      <svg ref={svgRef}
+           viewBox={`0 0 ${width} ${height}`}
+           preserveAspectRatio="xMidYMid slice"
+           onMouseDown={onBgDown}
+           onWheel={onWheel}>
+        <defs>
+          <radialGradient id="nodeGlow" cx="0.5" cy="0.5" r="0.5">
+            <stop offset="0%" stopColor="rgba(224,122,95,0.55)" />
+            <stop offset="60%" stopColor="rgba(224,122,95,0.08)" />
+            <stop offset="100%" stopColor="rgba(224,122,95,0)" />
+          </radialGradient>
+          <radialGradient id="nodeGlowKernel" cx="0.5" cy="0.5" r="0.5">
+            <stop offset="0%" stopColor="rgba(224,122,95,0.85)" />
+            <stop offset="50%" stopColor="rgba(224,122,95,0.18)" />
+            <stop offset="100%" stopColor="rgba(224,122,95,0)" />
+          </radialGradient>
+          <filter id="pulseBlur" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="1.2" />
+          </filter>
+        </defs>
+
+        <g transform={`translate(${view.x},${view.y}) scale(${view.k})`}>
+          {/* concentric guide rings — pure decoration */}
+          <g opacity="0.18" pointerEvents="none">
+            {[180, 320, 460].map((r,i) =>
+              <circle key={i} cx={width/2} cy={height/2} r={r} fill="none"
+                      stroke="rgba(255,255,255,0.08)" strokeDasharray="2 6" />)}
+          </g>
+
+          {/* edges */}
+          <g>
+            {links.map((l, i) => {
+              const a = nodes[l.s], b = nodes[l.t];
+              const aId = agents[l.s].id, bId = agents[l.t].id;
+              const dim = highlighted && !(highlighted.has(aId) && highlighted.has(bId));
+              return (
+                <path key={i}
+                      d={linkPath(a, b)}
+                      fill="none"
+                      stroke={dim ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.08)"}
+                      strokeWidth={0.6 + l.w * 0.9}
+                      strokeDasharray={agentMap[aId].status === "idle" || agentMap[bId].status === "idle" ? "3 5" : ""}
+                />
+              );
+            })}
+          </g>
+
+          {/* pulses — small dots traveling along edges */}
+          <g pointerEvents="none">
+            {pulses.map((p, i) => {
+              const l = links[p.linkIdx];
+              const a = nodes[l.s], b = nodes[l.t];
+              const pt = linkPoint(a, b, Math.min(1, p.t));
+              const c = pulseColor(p.lvl);
+              return (
+                <g key={i} transform={`translate(${pt.x} ${pt.y})`}>
+                  <circle r={4} fill={c} opacity="0.18" filter="url(#pulseBlur)" />
+                  <circle r={1.8} fill={c} />
+                </g>
+              );
+            })}
+          </g>
+
+          {/* nodes */}
+          <g>
+            {agents.map((a, i) => {
+              const n = nodes[i];
+              const isSel = selected === a.id;
+              const isHov = hover === a.id;
+              const dim = highlighted && !highlighted.has(a.id);
+              const isKernel = a.id === "kernel";
+              const r = isKernel ? 26 : 18;
+              const status = agentMap[a.id].status;
+              const statusColor = status === "active" ? "#8be38b"
+                                : status === "waiting" ? "#e6b85c"
+                                : status === "err"    ? "#e26d6d"
+                                : "rgba(255,255,255,0.25)";
+              return (
+                <g key={a.id} transform={`translate(${n.x} ${n.y})`}
+                   onMouseDown={(e) => onNodeDown(e, a.id)}
+                   onMouseEnter={() => setHover(a.id)}
+                   onMouseLeave={() => setHover(null)}
+                   onClick={(e) => { e.stopPropagation(); onSelect(a.id); }}
+                   style={{ cursor: "default", opacity: dim ? 0.35 : 1, transition: "opacity .2s" }}>
+                  {/* glow */}
+                  <circle r={r * 2.4} fill={`url(#${isKernel ? "nodeGlowKernel" : "nodeGlow"})`}
+                          opacity={status === "active" ? 1 : 0.35} />
+                  {/* halo if selected */}
+                  {(isSel || isHov) && (
+                    <circle r={r + 6} fill="none" stroke="rgba(224,122,95,0.9)"
+                            strokeWidth="1" strokeDasharray="2 3" />
+                  )}
+                  {/* body */}
+                  <circle r={r} fill={isKernel ? "#1a1410" : "#141414"}
+                          stroke="rgba(255,255,255,0.14)" strokeWidth="1" />
+                  <circle r={r} fill="none" stroke={statusColor}
+                          strokeWidth={isKernel ? "1.2" : "1"}
+                          strokeOpacity={status === "idle" ? 0.4 : 0.8}
+                          strokeDasharray={status === "waiting" ? "4 4" : ""} />
+                  {/* progress arc for active agents */}
+                  {status === "active" && agentMap[a.id].progress > 0 && (() => {
+                    const prog = agentMap[a.id].progress;
+                    const R = r + 3;
+                    const ang = prog * Math.PI * 2;
+                    const x1 = 0, y1 = -R;
+                    const x2 = Math.sin(ang) * R, y2 = -Math.cos(ang) * R;
+                    const large = ang > Math.PI ? 1 : 0;
+                    return <path d={`M ${x1} ${y1} A ${R} ${R} 0 ${large} 1 ${x2} ${y2}`}
+                                 fill="none" stroke="#E07A5F" strokeWidth="1.5"
+                                 strokeLinecap="round" opacity="0.85" />;
+                  })()}
+                  {/* glyph */}
+                  <text textAnchor="middle" dominantBaseline="central" y="0.5"
+                        fontFamily="'JetBrains Mono', monospace"
+                        fontWeight="600"
+                        fontSize={isKernel ? 14 : 12}
+                        fill={isKernel ? "#E07A5F" : "#e8e8e6"}>
+                    {a.glyph}
+                  </text>
+                  {/* status dot */}
+                  <circle cx={r * 0.72} cy={-r * 0.72} r={3.2}
+                          fill={statusColor}
+                          stroke="#0a0a0a" strokeWidth="1.5" />
+                  {/* label */}
+                  {showLabels && (
+                    <g transform={`translate(0 ${r + 16})`}>
+                      <text textAnchor="middle"
+                            fontFamily="'JetBrains Mono', monospace"
+                            fontSize="11" fill="#e8e8e6" opacity="0.92"
+                            style={{ paintOrder: "stroke", stroke: "#0a0a0a", strokeWidth: 3 }}>
+                        {a.name}
+                      </text>
+                      <text textAnchor="middle" y="13"
+                            fontFamily="'Inter', sans-serif"
+                            fontSize="9.5" fill="#5a5a55"
+                            style={{ paintOrder: "stroke", stroke: "#0a0a0a", strokeWidth: 3 }}>
+                        {AGENT_ROLES[a.role].label.toLowerCase()}
+                      </text>
+                    </g>
+                  )}
+                </g>
+              );
+            })}
+          </g>
+        </g>
+      </svg>
+    </div>
+  );
+}
+
+Object.assign(window, { AgentGraph });
+
+</script>
+
+<script type="text/babel" data-presets="react">
+/* ===== agent-ui.jsx ===== */
+// agent-ui.jsx — overlays: top bar, stats, detail panel, console, commander
+
+const { useState: useStateU, useMemo: useMemoU, useEffect: useEffectU, useRef: useRefU } = React;
+
+function Topbar({ stats }) {
+  return (
+    <div className="topbar">
+      <div className="brand">
+        <div className="brand-mark"></div>
+        <div>
+          <div className="brand-name">MOS <span className="brand-sub mono">0.42.1</span></div>
+        </div>
+      </div>
+      <div className="tabs">
+        <div className="tab active"><span className="dot"></span>Mesh</div>
+        <div className="tab">Traces</div>
+        <div className="tab">Policies</div>
+        <div className="tab">Budget</div>
+        <div className="tab">Settings</div>
+      </div>
+      <div className="topbar-right">
+        <div className="top-stat mono">trace.id <b>run_4f2a91</b></div>
+        <div className="top-stat">latency <b className="mono">{stats.latency}ms</b></div>
+        <div className="top-stat">tokens/s <b className="mono">{stats.tps.toLocaleString()}</b></div>
+        <div className="pill"><span className="pulse"></span><span>local · airgapped</span></div>
+      </div>
+    </div>
+  );
+}
+
+function LeftRail({ active, onPick }) {
+  const items = [
+    { id: "mesh",    label: "Mesh",     icon: "graph" },
+    { id: "traces",  label: "Traces",   icon: "trace" },
+    { id: "tools",   label: "Tools",    icon: "tool" },
+    { id: "memory",  label: "Memory",   icon: "mem" },
+    { id: "policy",  label: "Policies", icon: "lock" },
+  ];
+  const settings = [
+    { id: "settings", label: "Settings", icon: "cog" },
+  ];
+  const renderIcon = (k) => {
+    switch (k) {
+      case "graph": return <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.4">
+        <circle cx="4" cy="6" r="2"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="15" r="2"/>
+        <path d="M6 6h8M5 8l4 6M15 8l-4 6"/></svg>;
+      case "trace": return <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.4">
+        <path d="M3 5h14M3 10h10M3 15h14"/></svg>;
+      case "tool": return <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.4">
+        <path d="M13 3l4 4-6 6-4 1 1-4z"/><path d="M7 11l-4 4 2 2 4-4"/></svg>;
+      case "mem": return <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.4">
+        <rect x="3" y="5" width="14" height="10" rx="1.5"/><path d="M6 5v10M14 5v10M3 10h14"/></svg>;
+      case "lock": return <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.4">
+        <rect x="4" y="9" width="12" height="8" rx="1.5"/><path d="M7 9V6a3 3 0 016 0v3"/></svg>;
+      case "cog": return <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.4">
+        <circle cx="10" cy="10" r="2.5"/>
+        <path d="M10 3v2M10 15v2M3 10h2M15 10h2M5 5l1.5 1.5M13.5 13.5L15 15M5 15l1.5-1.5M13.5 6.5L15 5"/></svg>;
+    }
+  };
+  const Btn = ({ it }) => (
+    <div className={"rail-btn" + (active === it.id ? " active" : "")} onClick={() => onPick(it.id)}>
+      {renderIcon(it.icon)}
+      <span className="tip">{it.label}</span>
+    </div>
+  );
+  return (
+    <div className="leftrail">
+      {items.map(it => <Btn key={it.id} it={it} />)}
+      <div className="rail-divider"></div>
+      {settings.map(it => <Btn key={it.id} it={it} />)}
+    </div>
+  );
+}
+
+function StatOverlay({ stats }) {
+  return (
+    <div className="stat-overlay">
+      <div className="stat-card">
+        <div className="lbl">Active agents</div>
+        <div className="val">{stats.active}<small>/{stats.total}</small></div>
+      </div>
+      <div className="stat-card">
+        <div className="lbl">Tokens · session</div>
+        <div className="val mono">{(stats.tokens/1000).toFixed(1)}<small>k</small></div>
+        <div className="spark">
+          {stats.spark.map((v, i) =>
+            <span key={i} style={{ height: `${4 + v*20}px`, opacity: 0.35 + v*0.55 }} />)}
+        </div>
+      </div>
+      <div className="stat-card">
+        <div className="lbl">Cost · hour</div>
+        <div className="val mono">${stats.cost.toFixed(2)}<small> / $25.00</small></div>
+        <div className="spark" style={{ height: 6, marginTop: 8 }}>
+          <span style={{
+            flex: stats.cost / 25, height: 4, background: "#E07A5F", opacity: 0.85, borderRadius: 2
+          }} />
+          <span style={{
+            flex: 1 - stats.cost / 25, height: 4, background: "rgba(255,255,255,0.06)", opacity: 1, borderRadius: 2
+          }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Legend() {
+  return (
+    <div className="legend">
+      <div className="row"><div className="sw" style={{ background: "#8be38b" }}></div>active</div>
+      <div className="row"><div className="sw" style={{ background: "#e6b85c" }}></div>waiting</div>
+      <div className="row"><div className="sw" style={{ background: "#e26d6d" }}></div>error</div>
+      <div className="row"><div className="ln"></div>delegation</div>
+      <div className="row"><div className="ln dashed"></div>idle link</div>
+    </div>
+  );
+}
+
+function ZoomControls() {
+  return (
+    <div className="zoom">
+      <button onClick={() => window.__zoom?.in()}>+</button>
+      <button onClick={() => window.__zoom?.out()}>−</button>
+      <button onClick={() => window.__zoom?.home()} style={{ fontSize: 11 }}>⊙</button>
+    </div>
+  );
+}
+
+function Commander({ onSubmit }) {
+  const [val, setVal] = useStateU("");
+  const ref = useRefU(null);
+  useEffectU(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        ref.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+  return (
+    <div className="commander">
+      <span className="prompt">›</span>
+      <input ref={ref} value={val} onChange={e => setVal(e.target.value)}
+             placeholder="spawn an agent — e.g. retriever://github.com/acme/billing"
+             onKeyDown={e => {
+               if (e.key === "Enter" && val.trim()) {
+                 onSubmit(val.trim());
+                 setVal("");
+               }
+             }} />
+      <div className="hint"><span className="kbd">⌘K</span><span>focus</span></div>
+    </div>
+  );
+}
+
+function DetailPanel({ agent, agentMap, agents, edges, onSelect, onClose }) {
+  if (!agent) {
+    return (
+      <aside className="detail">
+        <div className="detail-empty">
+          <div className="ico">∅</div>
+          <p>Select an agent to inspect its task, tools, and traffic.</p>
+          <small>Tap a node, or use ⌘K to spawn a new one.</small>
+        </div>
+      </aside>
+    );
+  }
+  const live = agentMap[agent.id];
+  const role = AGENT_ROLES[agent.role];
+  const neighbors = useMemoU(() => {
+    const out = [], inc = [];
+    for (const [a, b, w] of edges) {
+      if (a === agent.id) {
+        const ag = agents.find(x => x.id === b);
+        if (ag) out.push({ ag, w });
+      } else if (b === agent.id) {
+        const ag = agents.find(x => x.id === a);
+        if (ag) inc.push({ ag, w });
+      }
+    }
+    return { out, inc };
+  }, [agent.id, edges, agents]);
+
+  return (
+    <aside className="detail">
+      <div className="detail-hd">
+        <div className="detail-hd-row">
+          <div className="agent-glyph mono"
+               style={{ color: role.color, borderColor: "rgba(255,255,255,0.18)" }}>
+            {agent.glyph}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h3 className="mono">{agent.name}</h3>
+            <div className="role">{role.label} · {agent.model}</div>
+          </div>
+          <button className="btn-ghost" onClick={onClose}>×</button>
+        </div>
+        <div className="status-row">
+          <span className={"status-chip " + live.status}>
+            <span className="d"></span>{live.status}
+          </span>
+          <span className="status-chip">runtime <span className="mono" style={{ marginLeft: 4 }}>{live.runtime}</span></span>
+          <span className="status-chip">pid <span className="mono" style={{ marginLeft: 4 }}>2481{agent.id.length}</span></span>
+        </div>
+      </div>
+
+      <div className="detail-body">
+        <div className="section">
+          <div className="section-hd"><div className="section-title">Current task</div></div>
+          <div className="task">
+            <div className="t-head"><span className="dot"></span>step {Math.floor(live.progress * 5) + 1} / 5</div>
+            <p>{live.task}</p>
+            {live.progress > 0 && (
+              <div className="progress"><div style={{ width: `${live.progress*100}%` }}></div></div>
+            )}
+          </div>
+        </div>
+
+        <div className="section">
+          <div className="section-hd"><div className="section-title">Resources</div></div>
+          <dl className="kv">
+            <dt>Tokens</dt><dd className="mono">{live.tokens.toLocaleString()}</dd>
+            <dt>Cost</dt><dd className="mono">${live.cost.toFixed(2)}</dd>
+            <dt>Model</dt><dd className="mono">{agent.model}</dd>
+            <dt>Memory</dt><dd className="mono">{(12 + agent.id.length * 3.2).toFixed(1)} MB</dd>
+            <dt>Trust</dt><dd className="mono">{agent.role === "sentinel" ? "system" : "user · scoped"}</dd>
+          </dl>
+        </div>
+
+        <div className="section">
+          <div className="section-hd"><div className="section-title">Tools · {agent.tools.length}</div></div>
+          <div className="tools">
+            {agent.tools.map(t => <span key={t} className="tool-chip mono">{t}</span>)}
+          </div>
+        </div>
+
+        <div className="section">
+          <div className="section-hd"><div className="section-title">Delegates to · {neighbors.out.length}</div></div>
+          <div className="neighbors">
+            {neighbors.out.length === 0 && <div style={{ fontSize: 11, color: "var(--text-faint)" }}>— none —</div>}
+            {neighbors.out.map(({ ag, w }) => (
+              <div key={ag.id} className="neighbor" onClick={() => onSelect(ag.id)}>
+                <span className="agent-glyph mono" style={{
+                  width: 22, height: 22, fontSize: 11,
+                  color: AGENT_ROLES[ag.role].color
+                }}>{ag.glyph}</span>
+                <span className="nm mono">{ag.name}</span>
+                <span className="role">{AGENT_ROLES[ag.role].label}</span>
+                <span className="arrow mono">w={w.toFixed(2)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="section">
+          <div className="section-hd"><div className="section-title">Receives from · {neighbors.inc.length}</div></div>
+          <div className="neighbors">
+            {neighbors.inc.length === 0 && <div style={{ fontSize: 11, color: "var(--text-faint)" }}>— none —</div>}
+            {neighbors.inc.map(({ ag, w }) => (
+              <div key={ag.id} className="neighbor" onClick={() => onSelect(ag.id)}>
+                <span className="agent-glyph mono" style={{
+                  width: 22, height: 22, fontSize: 11,
+                  color: AGENT_ROLES[ag.role].color
+                }}>{ag.glyph}</span>
+                <span className="nm mono">{ag.name}</span>
+                <span className="role">{AGENT_ROLES[ag.role].label}</span>
+                <span className="arrow mono">w={w.toFixed(2)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+function Console({ events, filter, setFilter, focusAgent, onPickAgent }) {
+  const bodyRef = useRefU(null);
+  const [autoscroll, setAutoscroll] = useStateU(true);
+
+  // counts
+  const counts = useMemoU(() => {
+    const c = { all: events.length, info: 0, ok: 0, warn: 0, err: 0, tool: 0 };
+    for (const e of events) if (c[e.lvl] !== undefined) c[e.lvl]++;
+    return c;
+  }, [events]);
+
+  const filtered = useMemoU(() => {
+    let evs = events;
+    if (filter !== "all") evs = evs.filter(e => e.lvl === filter);
+    if (focusAgent) evs = evs.filter(e => e.agent === focusAgent);
+    return evs.slice(-160);
+  }, [events, filter, focusAgent]);
+
+  useEffectU(() => {
+    if (autoscroll && bodyRef.current) {
+      bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
+    }
+  }, [filtered, autoscroll]);
+
+  return (
+    <div className="console">
+      <div className="console-hd">
+        <div className="title"><span className="d"></span>kernel.events</div>
+        <span style={{ color: "var(--text-faint)", marginLeft: 6 }}>
+          streaming → ~/.mos/runs/2026-05-11T14-22.jsonl
+        </span>
+        {focusAgent && (
+          <span className="pill" style={{ marginLeft: 12 }}>
+            <span style={{ color: "var(--text-faint)" }}>focus:</span>
+            <span className="mono">{focusAgent}</span>
+            <span onClick={() => onPickAgent(null)} style={{ cursor: "default", marginLeft: 4 }}>×</span>
+          </span>
+        )}
+        <div className="filter-tabs">
+          {["all","info","ok","warn","err","tool"].map(k => (
+            <div key={k} className={"ftab" + (filter === k ? " active" : "")}
+                 onClick={() => setFilter(k)}>
+              <span>{k}</span><span className="c">{counts[k] ?? 0}</span>
+            </div>
+          ))}
+          <label className="ftab" style={{ cursor: "default", marginLeft: 6 }}>
+            <input type="checkbox" checked={autoscroll}
+                   onChange={e => setAutoscroll(e.target.checked)}
+                   style={{ accentColor: "#E07A5F", width: 11, height: 11 }} />
+            auto-scroll
+          </label>
+        </div>
+      </div>
+      <div className="console-body" ref={bodyRef}>
+        {filtered.map(e => (
+          <div key={e.id} className={"evt " + e.lvl}>
+            <span className="ts mono">{e.ts}</span>
+            <span className="agent mono"
+                  onClick={() => onPickAgent(e.agent)}
+                  style={{ cursor: "default" }}>
+              <span className="lvl">{e.lvl.toUpperCase().padEnd(4," ")}</span>{e.agent}
+            </span>
+            <span className="msg">
+              {e.boot
+                ? <span className="arg mono">{e.parts[0]}</span>
+                : e.parts.map((p, i) => (
+                    <span key={i}>
+                      {i > 0 && <span className="arrow"> </span>}
+                      <span className={i === 0 ? "mono" : i === 1 ? "arg mono" : "mono"}
+                            style={i === 0 ? { color: "var(--text)" }
+                                  : i === 1 ? { color: "var(--accent)" }
+                                  : { color: "var(--text-dim)" }}>
+                        {p}
+                      </span>
+                    </span>
+                  ))
+              }
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, {
+  Topbar, LeftRail, StatOverlay, Legend, ZoomControls, Commander, DetailPanel, Console,
+});
+
+</script>
+
+<script type="text/babel" data-presets="react">
+/* ===== tweaks-panel.jsx ===== */
+
+// tweaks-panel.jsx
+// Reusable Tweaks shell + form-control helpers.
+//
+// Owns the host protocol (listens for __activate_edit_mode / __deactivate_edit_mode,
+// posts __edit_mode_available / __edit_mode_set_keys / __edit_mode_dismissed) so
+// individual prototypes don't re-roll it. Ships a consistent set of controls so you
+// don't hand-draw <input type="range">, segmented radios, steppers, etc.
+//
+// Usage (in an HTML file that loads React + Babel):
+//
+//   const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+//     "primaryColor": "#D97757",
+//     "palette": ["#D97757", "#29261b", "#f6f4ef"],
+//     "fontSize": 16,
+//     "density": "regular",
+//     "dark": false
+//   }/*EDITMODE-END*/;
+//
+//   function App() {
+//     const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+//     return (
+//       <div style={{ fontSize: t.fontSize, color: t.primaryColor }}>
+//         Hello
+//         <TweaksPanel>
+//           <TweakSection label="Typography" />
+//           <TweakSlider label="Font size" value={t.fontSize} min={10} max={32} unit="px"
+//                        onChange={(v) => setTweak('fontSize', v)} />
+//           <TweakRadio  label="Density" value={t.density}
+//                        options={['compact', 'regular', 'comfy']}
+//                        onChange={(v) => setTweak('density', v)} />
+//           <TweakSection label="Theme" />
+//           <TweakColor  label="Primary" value={t.primaryColor}
+//                        options={['#D97757', '#2A6FDB', '#1F8A5B', '#7A5AE0']}
+//                        onChange={(v) => setTweak('primaryColor', v)} />
+//           <TweakColor  label="Palette" value={t.palette}
+//                        options={[['#D97757', '#29261b', '#f6f4ef'],
+//                                  ['#475569', '#0f172a', '#f1f5f9']]}
+//                        onChange={(v) => setTweak('palette', v)} />
+//           <TweakToggle label="Dark mode" value={t.dark}
+//                        onChange={(v) => setTweak('dark', v)} />
+//         </TweaksPanel>
+//       </div>
+//     );
+//   }
+//
+// ─────────────────────────────────────────────────────────────────────────────
+
+const __TWEAKS_STYLE = `
+  .twk-panel{position:fixed;right:16px;bottom:16px;z-index:2147483646;width:280px;
+    max-height:calc(100vh - 32px);display:flex;flex-direction:column;
+    transform:scale(var(--dc-inv-zoom,1));transform-origin:bottom right;
+    background:rgba(250,249,247,.78);color:#29261b;
+    -webkit-backdrop-filter:blur(24px) saturate(160%);backdrop-filter:blur(24px) saturate(160%);
+    border:.5px solid rgba(255,255,255,.6);border-radius:14px;
+    box-shadow:0 1px 0 rgba(255,255,255,.5) inset,0 12px 40px rgba(0,0,0,.18);
+    font:11.5px/1.4 ui-sans-serif,system-ui,-apple-system,sans-serif;overflow:hidden}
+  .twk-hd{display:flex;align-items:center;justify-content:space-between;
+    padding:10px 8px 10px 14px;cursor:move;user-select:none}
+  .twk-hd b{font-size:12px;font-weight:600;letter-spacing:.01em}
+  .twk-x{appearance:none;border:0;background:transparent;color:rgba(41,38,27,.55);
+    width:22px;height:22px;border-radius:6px;cursor:default;font-size:13px;line-height:1}
+  .twk-x:hover{background:rgba(0,0,0,.06);color:#29261b}
+  .twk-body{padding:2px 14px 14px;display:flex;flex-direction:column;gap:10px;
+    overflow-y:auto;overflow-x:hidden;min-height:0;
+    scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.15) transparent}
+  .twk-body::-webkit-scrollbar{width:8px}
+  .twk-body::-webkit-scrollbar-track{background:transparent;margin:2px}
+  .twk-body::-webkit-scrollbar-thumb{background:rgba(0,0,0,.15);border-radius:4px;
+    border:2px solid transparent;background-clip:content-box}
+  .twk-body::-webkit-scrollbar-thumb:hover{background:rgba(0,0,0,.25);
+    border:2px solid transparent;background-clip:content-box}
+  .twk-row{display:flex;flex-direction:column;gap:5px}
+  .twk-row-h{flex-direction:row;align-items:center;justify-content:space-between;gap:10px}
+  .twk-lbl{display:flex;justify-content:space-between;align-items:baseline;
+    color:rgba(41,38,27,.72)}
+  .twk-lbl>span:first-child{font-weight:500}
+  .twk-val{color:rgba(41,38,27,.5);font-variant-numeric:tabular-nums}
+
+  .twk-sect{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+    color:rgba(41,38,27,.45);padding:10px 0 0}
+  .twk-sect:first-child{padding-top:0}
+
+  .twk-field{appearance:none;width:100%;height:26px;padding:0 8px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:7px;
+    background:rgba(255,255,255,.6);color:inherit;font:inherit;outline:none}
+  .twk-field:focus{border-color:rgba(0,0,0,.25);background:rgba(255,255,255,.85)}
+  select.twk-field{padding-right:22px;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='rgba(0,0,0,.5)' d='M0 0h10L5 6z'/></svg>");
+    background-repeat:no-repeat;background-position:right 8px center}
+
+  .twk-slider{appearance:none;-webkit-appearance:none;width:100%;height:4px;margin:6px 0;
+    border-radius:999px;background:rgba(0,0,0,.12);outline:none}
+  .twk-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
+    width:14px;height:14px;border-radius:50%;background:#fff;
+    border:.5px solid rgba(0,0,0,.12);box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:default}
+  .twk-slider::-moz-range-thumb{width:14px;height:14px;border-radius:50%;
+    background:#fff;border:.5px solid rgba(0,0,0,.12);box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:default}
+
+  .twk-seg{position:relative;display:flex;padding:2px;border-radius:8px;
+    background:rgba(0,0,0,.06);user-select:none}
+  .twk-seg-thumb{position:absolute;top:2px;bottom:2px;border-radius:6px;
+    background:rgba(255,255,255,.9);box-shadow:0 1px 2px rgba(0,0,0,.12);
+    transition:left .15s cubic-bezier(.3,.7,.4,1),width .15s}
+  .twk-seg.dragging .twk-seg-thumb{transition:none}
+  .twk-seg button{appearance:none;position:relative;z-index:1;flex:1;border:0;
+    background:transparent;color:inherit;font:inherit;font-weight:500;min-height:22px;
+    border-radius:6px;cursor:default;padding:4px 6px;line-height:1.2;
+    overflow-wrap:anywhere}
+
+  .twk-toggle{position:relative;width:32px;height:18px;border:0;border-radius:999px;
+    background:rgba(0,0,0,.15);transition:background .15s;cursor:default;padding:0}
+  .twk-toggle[data-on="1"]{background:#34c759}
+  .twk-toggle i{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .15s}
+  .twk-toggle[data-on="1"] i{transform:translateX(14px)}
+
+  .twk-num{display:flex;align-items:center;height:26px;padding:0 0 0 8px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:7px;background:rgba(255,255,255,.6)}
+  .twk-num-lbl{font-weight:500;color:rgba(41,38,27,.6);cursor:ew-resize;
+    user-select:none;padding-right:8px}
+  .twk-num input{flex:1;min-width:0;height:100%;border:0;background:transparent;
+    font:inherit;font-variant-numeric:tabular-nums;text-align:right;padding:0 8px 0 0;
+    outline:none;color:inherit;-moz-appearance:textfield}
+  .twk-num input::-webkit-inner-spin-button,.twk-num input::-webkit-outer-spin-button{
+    -webkit-appearance:none;margin:0}
+  .twk-num-unit{padding-right:8px;color:rgba(41,38,27,.45)}
+
+  .twk-btn{appearance:none;height:26px;padding:0 12px;border:0;border-radius:7px;
+    background:rgba(0,0,0,.78);color:#fff;font:inherit;font-weight:500;cursor:default}
+  .twk-btn:hover{background:rgba(0,0,0,.88)}
+  .twk-btn.secondary{background:rgba(0,0,0,.06);color:inherit}
+  .twk-btn.secondary:hover{background:rgba(0,0,0,.1)}
+
+  .twk-swatch{appearance:none;-webkit-appearance:none;width:56px;height:22px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:6px;padding:0;cursor:default;
+    background:transparent;flex-shrink:0}
+  .twk-swatch::-webkit-color-swatch-wrapper{padding:0}
+  .twk-swatch::-webkit-color-swatch{border:0;border-radius:5.5px}
+  .twk-swatch::-moz-color-swatch{border:0;border-radius:5.5px}
+
+  .twk-chips{display:flex;gap:6px}
+  .twk-chip{position:relative;appearance:none;flex:1;min-width:0;height:46px;
+    padding:0;border:0;border-radius:6px;overflow:hidden;cursor:default;
+    box-shadow:0 0 0 .5px rgba(0,0,0,.12),0 1px 2px rgba(0,0,0,.06);
+    transition:transform .12s cubic-bezier(.3,.7,.4,1),box-shadow .12s}
+  .twk-chip:hover{transform:translateY(-1px);
+    box-shadow:0 0 0 .5px rgba(0,0,0,.18),0 4px 10px rgba(0,0,0,.12)}
+  .twk-chip[data-on="1"]{box-shadow:0 0 0 1.5px rgba(0,0,0,.85),
+    0 2px 6px rgba(0,0,0,.15)}
+  .twk-chip>span{position:absolute;top:0;bottom:0;right:0;width:34%;
+    display:flex;flex-direction:column;box-shadow:-1px 0 0 rgba(0,0,0,.1)}
+  .twk-chip>span>i{flex:1;box-shadow:0 -1px 0 rgba(0,0,0,.1)}
+  .twk-chip>span>i:first-child{box-shadow:none}
+  .twk-chip svg{position:absolute;top:6px;left:6px;width:13px;height:13px;
+    filter:drop-shadow(0 1px 1px rgba(0,0,0,.3))}
+`;
+
+// ── useTweaks ───────────────────────────────────────────────────────────────
+// Single source of truth for tweak values. setTweak persists via the host
+// (__edit_mode_set_keys → host rewrites the EDITMODE block on disk).
+function useTweaks(defaults) {
+  const [values, setValues] = React.useState(defaults);
+  // Accepts either setTweak('key', value) or setTweak({ key: value, ... }) so a
+  // useState-style call doesn't write a "[object Object]" key into the persisted
+  // JSON block.
+  const setTweak = React.useCallback((keyOrEdits, val) => {
+    const edits = typeof keyOrEdits === 'object' && keyOrEdits !== null
+      ? keyOrEdits : { [keyOrEdits]: val };
+    setValues((prev) => ({ ...prev, ...edits }));
+    window.parent.postMessage({ type: '__edit_mode_set_keys', edits }, '*');
+    // Same-window signal so in-page listeners (deck-stage rail thumbnails)
+    // can react — the parent message only reaches the host, not peers.
+    window.dispatchEvent(new CustomEvent('tweakchange', { detail: edits }));
+  }, []);
+  return [values, setTweak];
+}
+
+// ── TweaksPanel ─────────────────────────────────────────────────────────────
+// Floating shell. Registers the protocol listener BEFORE announcing
+// availability — if the announce ran first, the host's activate could land
+// before our handler exists and the toolbar toggle would silently no-op.
+// The close button posts __edit_mode_dismissed so the host's toolbar toggle
+// flips off in lockstep; the host echoes __deactivate_edit_mode back which
+// is what actually hides the panel.
+function TweaksPanel({ title = 'Tweaks', noDeckControls = false, children }) {
+  const [open, setOpen] = React.useState(false);
+  const dragRef = React.useRef(null);
+  // Auto-inject a rail toggle when a <deck-stage> is on the page. The
+  // toggle drives the deck's per-viewer _railVisible via window message;
+  // state is mirrored from the same localStorage key the deck reads so
+  // the control reflects reality across reloads. The mechanism is the
+  // message — authors who want custom placement can post it directly
+  // and pass noDeckControls to suppress this one.
+  const hasDeckStage = React.useMemo(
+    () => typeof document !== 'undefined' && !!document.querySelector('deck-stage'),
+    [],
+  );
+  // Hide the toggle until the host has actually enabled the rail (the
+  // __omelette_rail_enabled window message, posted only when the
+  // omelette_deck_rail_enabled flag is on for this user). The initial read
+  // covers TweaksPanel mounting after the message already arrived; the
+  // listener covers the common case of mounting first.
+  const [railEnabled, setRailEnabled] = React.useState(
+    () => hasDeckStage && !!document.querySelector('deck-stage')?._railEnabled,
+  );
+  React.useEffect(() => {
+    if (!hasDeckStage || railEnabled) return undefined;
+    const onMsg = (e) => {
+      if (e.data && e.data.type === '__omelette_rail_enabled') setRailEnabled(true);
+    };
+    window.addEventListener('message', onMsg);
+    return () => window.removeEventListener('message', onMsg);
+  }, [hasDeckStage, railEnabled]);
+  const [railVisible, setRailVisible] = React.useState(() => {
+    try { return localStorage.getItem('deck-stage.railVisible') !== '0'; } catch (e) { return true; }
+  });
+  const toggleRail = (on) => {
+    setRailVisible(on);
+    window.postMessage({ type: '__deck_rail_visible', on }, '*');
+  };
+  const offsetRef = React.useRef({ x: 16, y: 16 });
+  const PAD = 16;
+
+  const clampToViewport = React.useCallback(() => {
+    const panel = dragRef.current;
+    if (!panel) return;
+    const w = panel.offsetWidth, h = panel.offsetHeight;
+    const maxRight = Math.max(PAD, window.innerWidth - w - PAD);
+    const maxBottom = Math.max(PAD, window.innerHeight - h - PAD);
+    offsetRef.current = {
+      x: Math.min(maxRight, Math.max(PAD, offsetRef.current.x)),
+      y: Math.min(maxBottom, Math.max(PAD, offsetRef.current.y)),
+    };
+    panel.style.right = offsetRef.current.x + 'px';
+    panel.style.bottom = offsetRef.current.y + 'px';
+  }, []);
+
+  React.useEffect(() => {
+    if (!open) return;
+    clampToViewport();
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', clampToViewport);
+      return () => window.removeEventListener('resize', clampToViewport);
+    }
+    const ro = new ResizeObserver(clampToViewport);
+    ro.observe(document.documentElement);
+    return () => ro.disconnect();
+  }, [open, clampToViewport]);
+
+  React.useEffect(() => {
+    const onMsg = (e) => {
+      const t = e?.data?.type;
+      if (t === '__activate_edit_mode') setOpen(true);
+      else if (t === '__deactivate_edit_mode') setOpen(false);
+    };
+    window.addEventListener('message', onMsg);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', onMsg);
+  }, []);
+
+  const dismiss = () => {
+    setOpen(false);
+    window.parent.postMessage({ type: '__edit_mode_dismissed' }, '*');
+  };
+
+  const onDragStart = (e) => {
+    const panel = dragRef.current;
+    if (!panel) return;
+    const r = panel.getBoundingClientRect();
+    const sx = e.clientX, sy = e.clientY;
+    const startRight = window.innerWidth - r.right;
+    const startBottom = window.innerHeight - r.bottom;
+    const move = (ev) => {
+      offsetRef.current = {
+        x: startRight - (ev.clientX - sx),
+        y: startBottom - (ev.clientY - sy),
+      };
+      clampToViewport();
+    };
+    const up = () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+  };
+
+  if (!open) return null;
+  return (
+    <>
+      <style>{__TWEAKS_STYLE}</style>
+      <div ref={dragRef} className="twk-panel" data-noncommentable=""
+           style={{ right: offsetRef.current.x, bottom: offsetRef.current.y }}>
+        <div className="twk-hd" onMouseDown={onDragStart}>
+          <b>{title}</b>
+          <button className="twk-x" aria-label="Close tweaks"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={dismiss}>✕</button>
+        </div>
+        <div className="twk-body">
+          {children}
+          {hasDeckStage && railEnabled && !noDeckControls && (
+            <TweakSection label="Deck">
+              <TweakToggle label="Thumbnail rail" value={railVisible} onChange={toggleRail} />
+            </TweakSection>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Layout helpers ──────────────────────────────────────────────────────────
+
+function TweakSection({ label, children }) {
+  return (
+    <>
+      <div className="twk-sect">{label}</div>
+      {children}
+    </>
+  );
+}
+
+function TweakRow({ label, value, children, inline = false }) {
+  return (
+    <div className={inline ? 'twk-row twk-row-h' : 'twk-row'}>
+      <div className="twk-lbl">
+        <span>{label}</span>
+        {value != null && <span className="twk-val">{value}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ── Controls ────────────────────────────────────────────────────────────────
+
+function TweakSlider({ label, value, min = 0, max = 100, step = 1, unit = '', onChange }) {
+  return (
+    <TweakRow label={label} value={`${value}${unit}`}>
+      <input type="range" className="twk-slider" min={min} max={max} step={step}
+             value={value} onChange={(e) => onChange(Number(e.target.value))} />
+    </TweakRow>
+  );
+}
+
+function TweakToggle({ label, value, onChange }) {
+  return (
+    <div className="twk-row twk-row-h">
+      <div className="twk-lbl"><span>{label}</span></div>
+      <button type="button" className="twk-toggle" data-on={value ? '1' : '0'}
+              role="switch" aria-checked={!!value}
+              onClick={() => onChange(!value)}><i /></button>
+    </div>
+  );
+}
+
+function TweakRadio({ label, value, options, onChange }) {
+  const trackRef = React.useRef(null);
+  const [dragging, setDragging] = React.useState(false);
+  // The active value is read by pointer-move handlers attached for the lifetime
+  // of a drag — ref it so a stale closure doesn't fire onChange for every move.
+  const valueRef = React.useRef(value);
+  valueRef.current = value;
+
+  // Segments wrap mid-word once per-segment width runs out. The track is
+  // ~248px (280 panel − 28 body pad − 4 seg pad), each button loses 12px
+  // to its own padding, and 11.5px system-ui averages ~6.3px/char — so 2
+  // options fit ~16 chars each, 3 fit ~10. Past that (or >3 options), fall
+  // back to a dropdown rather than wrap.
+  const labelLen = (o) => String(typeof o === 'object' ? o.label : o).length;
+  const maxLen = options.reduce((m, o) => Math.max(m, labelLen(o)), 0);
+  const fitsAsSegments = maxLen <= ({ 2: 16, 3: 10 }[options.length] ?? 0);
+  if (!fitsAsSegments) {
+    // <select> emits strings — map back to the original option value so the
+    // fallback stays type-preserving (numbers, booleans) like the segment path.
+    const resolve = (s) => {
+      const m = options.find((o) => String(typeof o === 'object' ? o.value : o) === s);
+      return m === undefined ? s : typeof m === 'object' ? m.value : m;
+    };
+    return <TweakSelect label={label} value={value} options={options}
+                        onChange={(s) => onChange(resolve(s))} />;
+  }
+  const opts = options.map((o) => (typeof o === 'object' ? o : { value: o, label: o }));
+  const idx = Math.max(0, opts.findIndex((o) => o.value === value));
+  const n = opts.length;
+
+  const segAt = (clientX) => {
+    const r = trackRef.current.getBoundingClientRect();
+    const inner = r.width - 4;
+    const i = Math.floor(((clientX - r.left - 2) / inner) * n);
+    return opts[Math.max(0, Math.min(n - 1, i))].value;
+  };
+
+  const onPointerDown = (e) => {
+    setDragging(true);
+    const v0 = segAt(e.clientX);
+    if (v0 !== valueRef.current) onChange(v0);
+    const move = (ev) => {
+      if (!trackRef.current) return;
+      const v = segAt(ev.clientX);
+      if (v !== valueRef.current) onChange(v);
+    };
+    const up = () => {
+      setDragging(false);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+
+  return (
+    <TweakRow label={label}>
+      <div ref={trackRef} role="radiogroup" onPointerDown={onPointerDown}
+           className={dragging ? 'twk-seg dragging' : 'twk-seg'}>
+        <div className="twk-seg-thumb"
+             style={{ left: `calc(2px + ${idx} * (100% - 4px) / ${n})`,
+                      width: `calc((100% - 4px) / ${n})` }} />
+        {opts.map((o) => (
+          <button key={o.value} type="button" role="radio" aria-checked={o.value === value}>
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </TweakRow>
+  );
+}
+
+function TweakSelect({ label, value, options, onChange }) {
+  return (
+    <TweakRow label={label}>
+      <select className="twk-field" value={value} onChange={(e) => onChange(e.target.value)}>
+        {options.map((o) => {
+          const v = typeof o === 'object' ? o.value : o;
+          const l = typeof o === 'object' ? o.label : o;
+          return <option key={v} value={v}>{l}</option>;
+        })}
+      </select>
+    </TweakRow>
+  );
+}
+
+function TweakText({ label, value, placeholder, onChange }) {
+  return (
+    <TweakRow label={label}>
+      <input className="twk-field" type="text" value={value} placeholder={placeholder}
+             onChange={(e) => onChange(e.target.value)} />
+    </TweakRow>
+  );
+}
+
+function TweakNumber({ label, value, min, max, step = 1, unit = '', onChange }) {
+  const clamp = (n) => {
+    if (min != null && n < min) return min;
+    if (max != null && n > max) return max;
+    return n;
+  };
+  const startRef = React.useRef({ x: 0, val: 0 });
+  const onScrubStart = (e) => {
+    e.preventDefault();
+    startRef.current = { x: e.clientX, val: value };
+    const decimals = (String(step).split('.')[1] || '').length;
+    const move = (ev) => {
+      const dx = ev.clientX - startRef.current.x;
+      const raw = startRef.current.val + dx * step;
+      const snapped = Math.round(raw / step) * step;
+      onChange(clamp(Number(snapped.toFixed(decimals))));
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+  return (
+    <div className="twk-num">
+      <span className="twk-num-lbl" onPointerDown={onScrubStart}>{label}</span>
+      <input type="number" value={value} min={min} max={max} step={step}
+             onChange={(e) => onChange(clamp(Number(e.target.value)))} />
+      {unit && <span className="twk-num-unit">{unit}</span>}
+    </div>
+  );
+}
+
+// Relative-luminance contrast pick — checkmarks drawn over a swatch need to
+// read on both #111 and #fafafa without per-option configuration. Hex input
+// only (#rgb / #rrggbb); named or rgb()/hsl() colors fall through to "light".
+function __twkIsLight(hex) {
+  const h = String(hex).replace('#', '');
+  const x = h.length === 3 ? h.replace(/./g, (c) => c + c) : h.padEnd(6, '0');
+  const n = parseInt(x.slice(0, 6), 16);
+  if (Number.isNaN(n)) return true;
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return r * 299 + g * 587 + b * 114 > 148000;
+}
+
+const __TwkCheck = ({ light }) => (
+  <svg viewBox="0 0 14 14" aria-hidden="true">
+    <path d="M3 7.2 5.8 10 11 4.2" fill="none" strokeWidth="2.2"
+          strokeLinecap="round" strokeLinejoin="round"
+          stroke={light ? 'rgba(0,0,0,.78)' : '#fff'} />
+  </svg>
+);
+
+// TweakColor — curated color/palette picker. Each option is either a single
+// hex string or an array of 1-5 hex strings; the card adapts — a lone color
+// renders solid, a palette renders colors[0] as the hero (left ~2/3) with the
+// rest stacked in a sharp column on the right. onChange emits the
+// option in the shape it was passed (string stays string, array stays array).
+// Without options it falls back to the native color input for back-compat.
+function TweakColor({ label, value, options, onChange }) {
+  if (!options || !options.length) {
+    return (
+      <div className="twk-row twk-row-h">
+        <div className="twk-lbl"><span>{label}</span></div>
+        <input type="color" className="twk-swatch" value={value}
+               onChange={(e) => onChange(e.target.value)} />
+      </div>
+    );
+  }
+  // Native <input type=color> emits lowercase hex per the HTML spec, so
+  // compare case-insensitively. String() guards JSON.stringify(undefined),
+  // which returns the primitive undefined (no .toLowerCase).
+  const key = (o) => String(JSON.stringify(o)).toLowerCase();
+  const cur = key(value);
+  return (
+    <TweakRow label={label}>
+      <div className="twk-chips" role="radiogroup">
+        {options.map((o, i) => {
+          const colors = Array.isArray(o) ? o : [o];
+          const [hero, ...rest] = colors;
+          const sup = rest.slice(0, 4);
+          const on = key(o) === cur;
+          return (
+            <button key={i} type="button" className="twk-chip" role="radio"
+                    aria-checked={on} data-on={on ? '1' : '0'}
+                    aria-label={colors.join(', ')} title={colors.join(' · ')}
+                    style={{ background: hero }}
+                    onClick={() => onChange(o)}>
+              {sup.length > 0 && (
+                <span>
+                  {sup.map((c, j) => <i key={j} style={{ background: c }} />)}
+                </span>
+              )}
+              {on && <__TwkCheck light={__twkIsLight(hero)} />}
+            </button>
+          );
+        })}
+      </div>
+    </TweakRow>
+  );
+}
+
+function TweakButton({ label, onClick, secondary = false }) {
+  return (
+    <button type="button" className={secondary ? 'twk-btn secondary' : 'twk-btn'}
+            onClick={onClick}>{label}</button>
+  );
+}
+
+Object.assign(window, {
+  useTweaks, TweaksPanel, TweakSection, TweakRow,
+  TweakSlider, TweakToggle, TweakRadio, TweakSelect,
+  TweakText, TweakNumber, TweakColor, TweakButton,
+});
+
+</script>
+
+<script type="text/babel" data-presets="react">
+/* ===== agent-app.jsx ===== */
+// agent-app.jsx — root app, wires data + UI + tweaks
+
+const { useState: useStateA, useMemo: useMemoA, useEffect: useEffectA, useRef: useRefA } = React;
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "showLabels": true,
+  "edgeMode": "curved",
+  "eventRate": 1.6,
+  "pulseRate": 2.6,
+  "density": "regular",
+  "accent": "#E07A5F"
+}/*EDITMODE-END*/;
+
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  // live agent state (status / progress / tokens drift over time)
+  const [agentMap, setAgentMap] = useStateA(() => {
+    const m = {};
+    for (const a of AGENTS) m[a.id] = { ...a };
+    return m;
+  });
+
+  const agents = useMemoA(() => AGENTS, []);
+  const [selected, setSelected] = useStateA("loom");
+  const [filter, setFilter] = useStateA("all");
+  const [consoleFocus, setConsoleFocus] = useStateA(null);
+  const [activeRail, setActiveRail] = useStateA("mesh");
+
+  // dims for the svg (use container size)
+  const [dims, setDims] = useStateA({ width: 1400, height: 800 });
+  useEffectA(() => {
+    const onR = () => setDims({ width: window.innerWidth, height: window.innerHeight });
+    onR();
+    window.addEventListener("resize", onR);
+    return () => window.removeEventListener("resize", onR);
+  }, []);
+
+  // drift agent state — tokens climb, progress wraps, statuses occasionally flip
+  useEffectA(() => {
+    const id = setInterval(() => {
+      setAgentMap(prev => {
+        const next = { ...prev };
+        for (const a of agents) {
+          const cur = { ...next[a.id] };
+          if (cur.status === "active") {
+            cur.progress = Math.min(1, cur.progress + (0.005 + Math.random() * 0.012));
+            cur.tokens += Math.floor(40 + Math.random() * 220);
+            cur.cost += Math.random() * 0.004 * (cur.role === "reasoner" ? 5 : 1);
+            // occasionally roll over progress + change task subtly
+            if (cur.progress >= 0.999) {
+              cur.progress = 0.05 + Math.random() * 0.2;
+            }
+          } else if (cur.status === "waiting") {
+            cur.tokens += Math.floor(Math.random() * 30);
+          }
+          next[a.id] = cur;
+        }
+        return next;
+      });
+    }, 900);
+    return () => clearInterval(id);
+  }, [agents]);
+
+  // derived stats
+  const stats = useMemoA(() => {
+    const vals = Object.values(agentMap);
+    const active = vals.filter(v => v.status === "active").length;
+    const tokens = vals.reduce((s,v) => s + v.tokens, 0);
+    const cost = vals.reduce((s,v) => s + v.cost, 0);
+    return {
+      total: vals.length,
+      active,
+      tokens,
+      cost,
+      tps: 1280 + Math.floor(Math.sin(Date.now()/4000) * 220 + Math.random()*120),
+      latency: 180 + Math.floor(Math.sin(Date.now()/3000) * 40 + Math.random()*30),
+      spark: Array.from({length: 28}, (_, i) =>
+        0.4 + 0.5 * Math.sin(i * 0.6 + Date.now()/2200) + Math.random() * 0.15),
+    };
+  }, [agentMap]);
+
+  // event stream
+  const events = useEventStream(SEED_EVENTS, agents, agentMap, { rate: t.eventRate });
+
+  const selectedAgent = agents.find(a => a.id === selected) || null;
+
+  const onCommanderSubmit = (text) => {
+    // append a synthetic kernel event
+    const ev = {
+      id: Date.now(),
+      ts: fmtTs(0),
+      lvl: "info",
+      agent: "kernel",
+      parts: ["spawn", "→", text],
+    };
+    // we don't actually mutate events from outside the hook; just nudge stat
+    // (kept minimal — a real OS would dispatch)
+    console.log("commander:", ev);
+  };
+
+  // apply tweaks → CSS vars
+  useEffectA(() => {
+    document.documentElement.style.setProperty("--accent", t.accent);
+    document.documentElement.style.setProperty("--accent-soft", t.accent + "29");
+  }, [t.accent]);
+
+  return (
+    <>
+      <AgentGraph
+        agents={agents}
+        agentMap={agentMap}
+        edges={EDGES}
+        selected={selected}
+        onSelect={(id) => setSelected(s => s === id ? null : id)}
+        dims={dims}
+        showLabels={t.showLabels}
+        edgeMode={t.edgeMode}
+      />
+
+      <div className="frame">
+        <Topbar stats={stats} />
+        <LeftRail active={activeRail} onPick={setActiveRail} />
+        <StatOverlay stats={stats} />
+        <Legend />
+        <ZoomControls />
+        <Commander onSubmit={onCommanderSubmit} />
+        <DetailPanel
+          agent={selectedAgent}
+          agentMap={agentMap}
+          agents={agents}
+          edges={EDGES}
+          onSelect={setSelected}
+          onClose={() => setSelected(null)}
+        />
+        <Console
+          events={events}
+          filter={filter}
+          setFilter={setFilter}
+          focusAgent={consoleFocus}
+          onPickAgent={setConsoleFocus}
+        />
+      </div>
+
+      <TweaksPanel title="Tweaks">
+        <TweakSection label="Display" />
+        <TweakToggle label="Node labels" value={t.showLabels}
+                     onChange={v => setTweak("showLabels", v)} />
+        <TweakRadio  label="Edges" value={t.edgeMode}
+                     options={["curved","straight"]}
+                     onChange={v => setTweak("edgeMode", v)} />
+        <TweakColor  label="Accent" value={t.accent}
+                     options={["#E07A5F","#7ec5ff","#8be38b","#c89cff","#e6b85c"]}
+                     onChange={v => setTweak("accent", v)} />
+        <TweakSection label="Simulation" />
+        <TweakSlider label="Event rate"  value={t.eventRate}
+                     min={0.2} max={6} step={0.1} unit="/s"
+                     onChange={v => setTweak("eventRate", v)} />
+        <TweakSlider label="Pulse rate"  value={t.pulseRate}
+                     min={0.5} max={8} step={0.1} unit="/s"
+                     onChange={v => setTweak("pulseRate", v)} />
+      </TweaksPanel>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+
+</script>
+
+</body>
+</html>

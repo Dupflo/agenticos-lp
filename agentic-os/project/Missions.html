@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>MOS — Missions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="agent-os.css" />
+<style>
+  .page{display:flex;flex-direction:column;min-height:calc(100vh - 48px);height:calc(100vh - 48px)}
+
+  /* page header */
+  .ph{padding:20px 28px 16px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:14px;flex-shrink:0}
+  .ph-top{display:flex;align-items:flex-end;gap:18px}
+  .ph-top h1{margin:0;font-size:22px;font-weight:600;letter-spacing:-0.01em}
+  .ph-top .sub{color:var(--text-faint);font-size:12px;margin-top:3px}
+  .view-switch{margin-left:auto;display:flex;gap:2px;padding:2px;background:var(--bg-elev);border:1px solid var(--line-strong);border-radius:7px}
+  .view-switch a{padding:5px 11px;border-radius:5px;font-size:11.5px;color:var(--text-dim);text-decoration:none;display:flex;align-items:center;gap:6px}
+  .view-switch a.on{background:var(--bg-elev-2);color:var(--text)}
+  .view-switch a:hover{color:var(--text)}
+
+  /* stat strip */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .stat{background:var(--bg-elev);border:1px solid var(--line);border-radius:9px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+  .stat .k{font-size:10.5px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-faint);display:flex;align-items:center;gap:6px}
+  .stat .v{font-family:'JetBrains Mono',monospace;font-size:22px;color:var(--text);font-variant-numeric:tabular-nums;line-height:1.05;font-weight:500}
+  .stat .delta{font-size:11px;color:var(--ok);font-family:'JetBrains Mono',monospace}
+  .stat .delta.warn{color:var(--warn)}
+  .stat .bar{height:4px;border-radius:2px;background:var(--bg);overflow:hidden;border:1px solid var(--line);margin-top:4px}
+  .stat .bar .f{height:100%;background:linear-gradient(90deg,var(--accent),#ea8a72)}
+
+  /* filter bar */
+  .filters{display:flex;align-items:center;gap:8px;padding:10px 28px;border-bottom:1px solid var(--line);background:var(--bg-elev);flex-shrink:0;flex-wrap:wrap}
+  .filter{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border:1px solid var(--line-strong);border-radius:6px;
+    background:var(--bg);font-size:11.5px;color:var(--text-dim);cursor:default;font-family:'JetBrains Mono',monospace}
+  .filter:hover{color:var(--text)}
+  .filter .k{color:var(--text-faint)}
+  .filter .v{color:var(--text)}
+  .filter.on{border-color:var(--accent-line);background:var(--accent-soft);color:var(--text)}
+  .filter .x{color:var(--text-faint);margin-left:2px;cursor:default}
+  .filter .x:hover{color:var(--text)}
+  .filters .sep{width:1px;height:18px;background:var(--line);margin:0 4px}
+  .filters .search{flex:1;max-width:260px;margin-left:auto;position:relative}
+  .filters .search input{height:28px;padding-left:28px;font-size:11.5px}
+  .filters .search svg{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--text-faint)}
+
+  /* table + detail layout */
+  .body{flex:1;display:grid;grid-template-columns:1fr 460px;min-height:0;overflow:hidden}
+  .body.no-detail{grid-template-columns:1fr}
+
+  .tbl-wrap{overflow:auto;min-width:0;min-height:0}
+  table.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:12.5px}
+  table.tbl thead th{position:sticky;top:0;background:var(--bg-elev);border-bottom:1px solid var(--line-strong);
+    text-align:left;padding:10px 12px;font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-faint);font-weight:500;
+    cursor:default;z-index:1}
+  table.tbl thead th .sort{margin-left:4px;color:var(--accent);font-size:9px}
+  table.tbl thead th.num{text-align:right}
+  table.tbl tbody td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:middle;color:var(--text-dim)}
+  table.tbl tbody td.num{text-align:right;font-family:'JetBrains Mono',monospace;color:var(--text);font-variant-numeric:tabular-nums}
+  table.tbl tbody td.mono{font-family:'JetBrains Mono',monospace}
+  table.tbl tbody tr:nth-child(even){background:rgba(255,255,255,0.012)}
+  table.tbl tbody tr:hover{background:var(--bg-elev-2);cursor:default}
+  table.tbl tbody tr.on{background:rgba(224,122,95,0.07)}
+  table.tbl tbody tr.on td:first-child{border-left:2px solid var(--accent);padding-left:10px}
+  table.tbl .id{color:var(--text-faint);font-family:'JetBrains Mono',monospace;font-size:11.5px}
+  table.tbl .title{color:var(--text);font-weight:500}
+  table.tbl .ag{display:inline-flex;align-items:center;gap:6px}
+  table.tbl .ag .g{width:18px;height:18px;border-radius:4px;background:var(--bg);border:1px solid var(--line-strong);
+    display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--accent);font-weight:600}
+  table.tbl .ag .nm{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--text)}
+  .pill-num{font-family:'JetBrains Mono',monospace;color:var(--text);font-variant-numeric:tabular-nums;font-size:11.5px}
+  .pill-num .sub{color:var(--text-faint);font-size:10.5px;margin-left:3px}
+
+  /* detail panel */
+  .detail{border-left:1px solid var(--line);background:var(--bg-elev);display:flex;flex-direction:column;min-height:0}
+  .detail-hd{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+  .detail-hd .top{display:flex;align-items:center;gap:8px}
+  .detail-hd .id{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-faint)}
+  .detail-hd .close{margin-left:auto;width:24px;height:24px;border:0;background:transparent;color:var(--text-faint);border-radius:5px;display:flex;align-items:center;justify-content:center}
+  .detail-hd .close:hover{background:var(--bg-elev-2);color:var(--text)}
+  .detail-hd h2{margin:0;font-size:16px;font-weight:600;letter-spacing:-0.005em;color:var(--text);line-height:1.3}
+  .detail-meta{display:flex;align-items:center;gap:14px;font-size:11.5px;color:var(--text-faint);flex-wrap:wrap}
+  .detail-meta b{color:var(--text);font-weight:500}
+
+  .detail-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);
+    border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .detail-stats .ds{padding:11px;background:var(--bg-elev);display:flex;flex-direction:column;gap:3px}
+  .detail-stats .ds .k{font-size:9.5px;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-faint)}
+  .detail-stats .ds .v{font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--text);font-variant-numeric:tabular-nums}
+
+  .detail-tabs{display:flex;gap:0;padding:0 18px;border-bottom:1px solid var(--line);background:var(--bg-elev)}
+  .detail-tabs .t{padding:10px 0;margin-right:18px;font-size:12px;color:var(--text-dim);cursor:default;border-bottom:2px solid transparent;display:flex;align-items:center;gap:6px}
+  .detail-tabs .t:hover{color:var(--text)}
+  .detail-tabs .t.on{color:var(--text);border-bottom-color:var(--accent)}
+  .detail-tabs .t .ct{font-size:10.5px;color:var(--text-faint);font-family:'JetBrains Mono',monospace}
+  .detail-tabs .t.on .ct{color:var(--accent)}
+
+  .detail-body{flex:1;overflow-y:auto;padding:14px 18px 22px}
+
+  /* timeline */
+  .tl{display:flex;flex-direction:column;gap:0;position:relative}
+  .tl::before{content:"";position:absolute;left:8px;top:8px;bottom:8px;width:1px;background:var(--line)}
+  .tl-ev{position:relative;display:flex;gap:14px;padding:8px 0;align-items:flex-start}
+  .tl-ev .node{width:16px;height:16px;border-radius:50%;background:var(--bg-elev);border:2px solid var(--text-faint);
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;z-index:1;margin-top:1px}
+  .tl-ev.ok   .node{border-color:var(--ok);background:rgba(139,227,139,0.08)}
+  .tl-ev.tool .node{border-color:#c89cff;background:rgba(200,156,255,0.1)}
+  .tl-ev.warn .node{border-color:var(--warn);background:rgba(230,184,92,0.1)}
+  .tl-ev.start .node{border-color:var(--accent);background:var(--accent);box-shadow:0 0 0 3px rgba(224,122,95,0.2)}
+  .tl-ev.end   .node{border-color:var(--ok);background:var(--ok)}
+  .tl-meta{flex:1;display:flex;flex-direction:column;gap:3px;min-width:0}
+  .tl-meta .top{display:flex;align-items:center;gap:8px}
+  .tl-meta .ty{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--text);font-weight:500}
+  .tl-meta .ts{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--text-faint);margin-left:auto}
+  .tl-meta .ds{font-size:11.5px;color:var(--text-dim);line-height:1.45;font-family:'JetBrains Mono',monospace}
+  .tl-meta .ds .tag{color:#c89cff}
+  .tl-meta .ds .num{color:#f0d3a8}
+  .tl-meta .ds .str{color:#a4d984}
+
+  /* output tab */
+  .output-md{padding:0;font-size:13px;line-height:1.65;color:var(--text)}
+  .output-md h1,.output-md h2,.output-md h3{margin:12px 0 8px;font-weight:600;letter-spacing:-0.01em}
+  .output-md h1{font-size:17px}
+  .output-md h2{font-size:14.5px}
+  .output-md h3{font-size:13px;color:var(--text-dim);text-transform:none}
+  .output-md p{margin:6px 0}
+  .output-md ul{margin:6px 0;padding-left:18px}
+  .output-md li{margin:2px 0}
+  .output-md code{background:rgba(255,255,255,0.07);padding:1px 5px;border-radius:3px;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#f0d3a8}
+  .output-md pre{background:#0a0a0a;border:1px solid var(--line);border-radius:7px;padding:11px 12px;
+    font-family:'JetBrains Mono',monospace;font-size:11.5px;line-height:1.55;overflow-x:auto;margin:8px 0}
+  .output-md strong{color:var(--text);font-weight:600}
+
+  /* logs */
+  .logs{font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.6;color:var(--text-dim);
+    background:#080808;border:1px solid var(--line);border-radius:7px;padding:11px 12px;white-space:pre-wrap;word-break:break-all}
+  .logs .k{color:#7ec5ff}.logs .s{color:#a4d984}.logs .n{color:#f0d3a8}.logs .c{color:var(--text-faint);font-style:italic}
+
+</style>
+</head>
+<body>
+
+<header class="os-top">
+  <div class="os-brand">
+    <div class="os-brand-mark"></div>
+    <div><div class="os-brand-name">MOS <span class="os-brand-sub mono">0.42.1</span></div></div>
+  </div>
+  <nav class="os-tabs">
+    <a class="os-tab" href="Agent Visualizer.html"><span class="dot"></span>Mesh</a>
+    <a class="os-tab" href="Edit Agent Config.html"><span class="dot"></span>Agents</a>
+    <a class="os-tab" href="Chat Agent.html"><span class="dot"></span>Chat</a>
+    <a class="os-tab" href="Memory Editor.html"><span class="dot"></span>Memory</a>
+    <a class="os-tab active"><span class="dot"></span>Missions</a>
+    <a class="os-tab" href="Kanban Board.html">Board</a>
+  </nav>
+  <div class="os-top-right">
+    <span class="mono" style="color:var(--text-faint)">trace.id run_4f2a91</span>
+    <div class="os-pill"><span class="pulse"></span><span>local · airgapped</span></div>
+  </div>
+</header>
+
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useMemo } = React;
+
+const A = (id, glyph) => ({ id, glyph });
+const AGENTS = {
+  kernel: A("kernel","K"), atlas: A("atlas","A"), loom: A("loom","L"),
+  forge:  A("forge","F"),  ledger:A("ledger","$"), scout:A("scout","S"),
+  harbor: A("harbor","H"), echo:A("echo","E")
+};
+
+const MISSIONS = [
+  { id:"m_a91", title:"Fix auth refresh-token regression", agent:"forge", start:"2026-05-11 14:08", duration:"4m 12s", cost:0.42, tin:24189, tout:6810, status:"running",  domain:"engineering" },
+  { id:"m_a90", title:"Synthesize weekly Acme sync into 4 bullets", agent:"loom", start:"2026-05-11 14:14", duration:"38s", cost:0.08, tin:5210, tout:910, status:"done", domain:"writing" },
+  { id:"m_a8f", title:"Crawl notion workspace · shard 3/8", agent:"atlas", start:"2026-05-11 13:50", duration:"22m 04s", cost:1.84, tin:128400, tout:2100, status:"running", domain:"research" },
+  { id:"m_a8e", title:"Triage inbox · 47 items → 6 actionable", agent:"scout", start:"2026-05-11 12:15", duration:"1m 09s", cost:0.04, tin:2840, tout:1120, status:"done", domain:"ops" },
+  { id:"m_a8d", title:"Rate-limit fix for notion API client", agent:"harbor", start:"2026-05-11 11:42", duration:"2m 51s", cost:0.16, tin:8420, tout:1900, status:"failed", domain:"engineering" },
+  { id:"m_a8c", title:"Generate Q2 planning doc · v3", agent:"loom", start:"2026-05-11 10:28", duration:"6m 04s", cost:0.92, tin:21800, tout:8400, status:"done", domain:"writing" },
+  { id:"m_a8b", title:"Cap spend report · last 24h", agent:"ledger", start:"2026-05-11 10:00", duration:"3s", cost:0.01, tin:480, tout:210, status:"done", domain:"ops" },
+  { id:"m_a8a", title:"Migrate calendar webhook to v2", agent:"forge", start:"2026-05-11 09:14", duration:"14m 38s", cost:1.21, tin:38400, tout:4200, status:"done", domain:"engineering" },
+  { id:"m_a89", title:"Research: best CRDT libs for offline-first", agent:"atlas", start:"2026-05-11 08:50", duration:"9m 22s", cost:0.74, tin:52100, tout:2800, status:"done", domain:"research" },
+  { id:"m_a88", title:"Draft response · investor email Marc", agent:"loom", start:"2026-05-10 23:11", duration:"1m 44s", cost:0.18, tin:6420, tout:2100, status:"done", domain:"writing" },
+  { id:"m_a87", title:"Backup ~/projects/acme/ to encrypted drive", agent:"forge", start:"2026-05-10 22:00", duration:"42m 11s", cost:0.06, tin:920, tout:140, status:"done", domain:"ops" },
+  { id:"m_a86", title:"Watch hacker news for keyword 'mos'", agent:"scout", start:"2026-05-10 21:30", duration:"—", cost:0.02, tin:1840, tout:280, status:"failed", domain:"research" },
+];
+
+const DETAIL = {
+  m_a91: {
+    events:[
+      { ts:"14:08:48", ty:"Start", k:"start", body:"mission: fix auth refresh-token regression" },
+      { ts:"14:08:51", ty:"PreToolUse",  k:"tool", body:'<span class="tag">fs.read</span>(["src/api/login.ts","src/middleware/refresh.ts"])' },
+      { ts:"14:08:51", ty:"PostToolUse", k:"ok",   body:'<span class="tag">fs.read</span> ok · <span class="num">2104</span> bytes · <span class="num">42</span>ms' },
+      { ts:"14:09:14", ty:"PreToolUse",  k:"tool", body:'<span class="tag">fs.write</span>(src/middleware/refresh.ts)' },
+      { ts:"14:09:14", ty:"PostToolUse", k:"ok",   body:'<span class="tag">fs.write</span> ok · <span class="num">+22</span>/<span class="num">−4</span> lines' },
+      { ts:"14:09:30", ty:"PreToolUse",  k:"tool", body:'<span class="tag">shell</span>("pnpm test --filter pkg/auth")' },
+      { ts:"14:10:18", ty:"PostToolUse", k:"warn", body:'<span class="tag">shell</span> exit <span class="num">0</span> · <span class="num">142/210</span> passing · <span class="num">1840</span>ms' },
+      { ts:"14:11:42", ty:"PreToolUse",  k:"tool", body:'<span class="tag">policy.check</span>("git.push origin auth-refresh-fix")' },
+      { ts:"14:11:42", ty:"PostToolUse", k:"ok",   body:'<span class="tag">policy.check</span> approved by <span class="str">"warden"</span>' },
+      { ts:"14:12:02", ty:"PreToolUse",  k:"tool", body:'<span class="tag">shell</span>("git add -p && git commit && git push")' },
+      { ts:"14:12:03", ty:"PostToolUse", k:"ok",   body:'<span class="tag">shell</span> exit <span class="num">0</span> · <span class="num">980</span>ms · PR acme/billing#<span class="num">4117</span>' },
+    ],
+    output: `<h1>Mission: Fix auth refresh-token regression</h1>
+<p><strong>Outcome:</strong> patch applied, tests parity with main, PR opened.</p>
+<h2>Root cause</h2>
+<p><code>refresh()</code> in <code>src/middleware/refresh.ts</code> returned <code>null</code> silently when the rotation throws <code>EXPIRED</code>.</p>
+<h2>Fix</h2>
+<p>Fall back to <code>rt.legacy</code> cookie once before propagating the error.</p>
+<pre><span style="color:#c89cff">try</span> {
+  <span style="color:#c89cff">return await</span> rotateRefreshToken(token);
+} <span style="color:#c89cff">catch</span> (e) {
+  <span style="color:#c89cff">if</span> (e.code === <span style="color:#a4d984">"EXPIRED"</span>) {
+    <span style="color:#c89cff">const</span> legacy = req.cookies.get(<span style="color:#a4d984">"rt.legacy"</span>);
+    <span style="color:#c89cff">if</span> (legacy) <span style="color:#c89cff">return</span> rotateRefreshToken(legacy);
+  }
+  <span style="color:#c89cff">throw</span> e;
+}</pre>
+<h2>Risk</h2>
+<ul>
+  <li><strong>Low</strong> — guarded by single try/catch, covered by <code>refresh.spec.ts</code>.</li>
+  <li>Rollback: revert one commit, no schema change.</li>
+</ul>
+<p>PR: <strong>acme/billing#4117</strong></p>`,
+    logs: `{<span class="k">"trace_id"</span>: <span class="s">"run_4f2a91"</span>, <span class="k">"mission"</span>: <span class="s">"m_a91"</span>, <span class="k">"agent"</span>: <span class="s">"forge"</span>}
+{<span class="k">"ts"</span>: <span class="s">"14:08:48.214Z"</span>, <span class="k">"event"</span>: <span class="s">"Start"</span>, <span class="k">"prompt_tokens"</span>: <span class="n">5410</span>}
+{<span class="k">"ts"</span>: <span class="s">"14:08:51.602Z"</span>, <span class="k">"event"</span>: <span class="s">"PreToolUse"</span>, <span class="k">"tool"</span>: <span class="s">"fs.read"</span>, <span class="k">"args"</span>: [<span class="s">"src/api/login.ts"</span>, <span class="s">"src/middleware/refresh.ts"</span>]}
+{<span class="k">"ts"</span>: <span class="s">"14:08:51.644Z"</span>, <span class="k">"event"</span>: <span class="s">"PostToolUse"</span>, <span class="k">"tool"</span>: <span class="s">"fs.read"</span>, <span class="k">"ok"</span>: true, <span class="k">"bytes"</span>: <span class="n">2104</span>, <span class="k">"ms"</span>: <span class="n">42</span>}
+<span class="c">// ... 18 more events ...</span>
+{<span class="k">"ts"</span>: <span class="s">"14:12:03.190Z"</span>, <span class="k">"event"</span>: <span class="s">"Stop"</span>, <span class="k">"status"</span>: <span class="s">"running"</span>, <span class="k">"reason"</span>: <span class="s">"awaiting_review"</span>}`
+  }
+};
+const defaultDetail = (m) => ({
+  events: [
+    { ts: m.start.slice(11), ty:"Start", k:"start", body:`mission: ${m.title}` },
+    { ts: "—", ty:"PreToolUse", k:"tool", body:'<span class="tag">context.load</span>(memory, scope: ' + m.agent + ')' },
+    { ts: "—", ty:"PostToolUse", k:"ok", body:'context loaded · <span class="num">' + m.tin + '</span> tokens' },
+    { ts: "—", ty:"PreToolUse", k:"tool", body:'<span class="tag">' + (m.agent==="atlas"?"search.local":m.agent==="loom"?"write":"shell") + '</span>(...)' },
+    { ts: "—", ty: m.status==="failed"?"PostToolUse":"PostToolUse", k: m.status==="failed"?"warn":"ok",
+      body: m.status==="failed" ? '<span class="tag">error</span> rate-limit exceeded · backoff <span class="num">28s</span>' : 'output drafted · <span class="num">' + m.tout + '</span> tokens' },
+    ...(m.status==="done" ? [{ ts:"—", ty:"Stop", k:"end", body:"mission complete" }] : [])
+  ],
+  output: `<h2>${m.title}</h2><p>Mission status: <strong>${m.status}</strong>. Detailed output not shown in this view.</p>`,
+  logs: `{<span class="k">"mission"</span>: <span class="s">"${m.id}"</span>, <span class="k">"agent"</span>: <span class="s">"${m.agent}"</span>, <span class="k">"status"</span>: <span class="s">"${m.status}"</span>}
+<span class="c">// ${m.tin} input tokens, ${m.tout} output tokens, $${m.cost.toFixed(2)}</span>`
+});
+
+const Icon = ({ k, size=14 }) => {
+  const s = { width:size, height:size, display:"inline-block", verticalAlign:"middle" };
+  const stroke = { fill:"none", stroke:"currentColor", strokeWidth:1.5, strokeLinecap:"round", strokeLinejoin:"round" };
+  switch(k) {
+    case "search": return <svg style={s} viewBox="0 0 20 20" {...stroke}><circle cx="9" cy="9" r="5.5"/><path d="M13 13l3.5 3.5"/></svg>;
+    case "x":      return <svg style={s} viewBox="0 0 20 20" {...stroke}><path d="M5 5l10 10M15 5L5 15"/></svg>;
+    case "down":   return <svg style={s} viewBox="0 0 10 10" {...stroke}><path d="M2 4l3 3 3-3"/></svg>;
+    case "calendar": return <svg style={s} viewBox="0 0 20 20" {...stroke}><rect x="3" y="5" width="14" height="12" rx="1.5"/><path d="M7 3v4M13 3v4M3 9h14"/></svg>;
+    case "trend":  return <svg style={s} viewBox="0 0 20 20" {...stroke}><path d="M3 14l5-5 4 4 5-7"/><path d="M13 6h4v4"/></svg>;
+    case "doc":    return <svg style={s} viewBox="0 0 20 20" {...stroke}><path d="M5 2.5h7l4 4V17a.5.5 0 01-.5.5h-11A.5.5 0 014 17V3a.5.5 0 01.5-.5z"/><path d="M12 2.5V6h4"/></svg>;
+    case "logs":   return <svg style={s} viewBox="0 0 20 20" {...stroke}><path d="M3 6h10M3 10h14M3 14h8"/></svg>;
+    case "tl":     return <svg style={s} viewBox="0 0 20 20" {...stroke}><circle cx="5" cy="5" r="2"/><circle cx="5" cy="15" r="2"/><path d="M5 7v6M9 5h7M9 15h4"/></svg>;
+    case "export": return <svg style={s} viewBox="0 0 20 20" {...stroke}><path d="M4 13v3a1 1 0 001 1h10a1 1 0 001-1v-3M10 3v10M6 7l4-4 4 4"/></svg>;
+  }
+  return null;
+};
+
+const Status = ({ s }) => {
+  const cfg = {
+    running:{ cl:"warn",  txt:"running"},
+    done:   { cl:"ok",    txt:"done"},
+    failed: { cl:"err",   txt:"failed"},
+  }[s];
+  return <span className={"badge "+cfg.cl}><span className="d"></span>{cfg.txt}</span>;
+};
+
+function App() {
+  const [sel, setSel] = useState("m_a91");
+  const [tab, setTab] = useState("timeline");
+  const [filters, setFilters] = useState({ agent:null, status:null, domain:null });
+  const [search, setSearch] = useState("");
+
+  const filtered = MISSIONS.filter(m =>
+    (!filters.agent  || m.agent  === filters.agent)  &&
+    (!filters.status || m.status === filters.status) &&
+    (!filters.domain || m.domain === filters.domain) &&
+    (!search.trim()  || m.title.toLowerCase().includes(search.toLowerCase()) || m.id.includes(search.toLowerCase()))
+  );
+
+  const totals = useMemo(() => {
+    const tot = MISSIONS.reduce((s,m) => ({ cost: s.cost + m.cost, tin: s.tin + m.tin, tout: s.tout + m.tout }), {cost:0,tin:0,tout:0});
+    const running = MISSIONS.filter(m => m.status === "running").length;
+    const failed  = MISSIONS.filter(m => m.status === "failed").length;
+    return { ...tot, n: MISSIONS.length, running, failed };
+  }, []);
+
+  const mission = MISSIONS.find(m => m.id === sel);
+  const detail  = mission ? (DETAIL[mission.id] || defaultDetail(mission)) : null;
+
+  const toggleFilter = (k, v) => setFilters(f => ({...f, [k]: f[k] === v ? null : v }));
+
+  return (
+    <div className="page">
+      <div className="ph">
+        <div className="ph-top">
+          <div>
+            <h1>Missions</h1>
+            <div className="sub">All agent-owned tasks · sorted by start time · last 30 days</div>
+          </div>
+          <div className="view-switch">
+            <a className="on">Table</a>
+            <a href="Kanban Board.html">Kanban</a>
+            <a>Calendar</a>
+          </div>
+        </div>
+        <div className="stats">
+          <div className="stat">
+            <div className="k">missions this month</div>
+            <div className="v">847</div>
+            <div className="delta">▲ 12% vs Apr</div>
+          </div>
+          <div className="stat">
+            <div className="k">total cost · this month</div>
+            <div className="v">$48.20</div>
+            <div className="bar"><div className="f" style={{width:"38%"}}></div></div>
+            <div className="delta" style={{color:"var(--text-faint)"}}>38% of $125 cap</div>
+          </div>
+          <div className="stat">
+            <div className="k">tokens consumed</div>
+            <div className="v">12.4M</div>
+            <div className="delta">▲ in 9.8M · out 2.6M</div>
+          </div>
+          <div className="stat">
+            <div className="k">success rate · 7d</div>
+            <div className="v">94.2%</div>
+            <div className="delta warn">▼ −1.4 pp · {totals.failed} failed</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="filters">
+        <span className="filter" style={{borderStyle:"dashed",cursor:"default"}}>
+          <Icon k="calendar" size={12}/>last 30 days <Icon k="down" size={10}/>
+        </span>
+        <span className="filter"><span className="k">agent</span>
+          <select className="mono" style={{background:"transparent",border:0,color:"var(--text)",fontSize:11.5,outline:"none"}}
+                  value={filters.agent || ""} onChange={e=>setFilters(f=>({...f,agent:e.target.value||null}))}>
+            <option value="">any</option>
+            {Object.keys(AGENTS).map(a => <option key={a} value={a}>{a}</option>)}
+          </select>
+        </span>
+        <span className="filter"><span className="k">status</span>
+          <select className="mono" style={{background:"transparent",border:0,color:"var(--text)",fontSize:11.5,outline:"none"}}
+                  value={filters.status || ""} onChange={e=>setFilters(f=>({...f,status:e.target.value||null}))}>
+            <option value="">any</option>
+            <option value="running">running</option>
+            <option value="done">done</option>
+            <option value="failed">failed</option>
+          </select>
+        </span>
+        <span className="filter"><span className="k">domain</span>
+          <select className="mono" style={{background:"transparent",border:0,color:"var(--text)",fontSize:11.5,outline:"none"}}
+                  value={filters.domain || ""} onChange={e=>setFilters(f=>({...f,domain:e.target.value||null}))}>
+            <option value="">any</option>
+            <option value="engineering">engineering</option>
+            <option value="writing">writing</option>
+            <option value="research">research</option>
+            <option value="ops">ops</option>
+          </select>
+        </span>
+        {(filters.agent || filters.status || filters.domain) && (
+          <span className="filter on" onClick={()=>setFilters({agent:null,status:null,domain:null})}>
+            clear filters <Icon k="x" size={10}/>
+          </span>
+        )}
+        <span className="sep"></span>
+        <span style={{fontSize:11.5,color:"var(--text-faint)",fontFamily:"'JetBrains Mono',monospace"}}>{filtered.length} of {MISSIONS.length}</span>
+        <div className="search">
+          <Icon k="search" />
+          <input className="input" placeholder="search title or id…" value={search} onChange={e=>setSearch(e.target.value)}/>
+        </div>
+        <button className="btn btn-ghost btn-sm"><Icon k="export" size={12}/>Export CSV</button>
+      </div>
+
+      <div className={"body" + (mission ? "" : " no-detail")}>
+        <div className="tbl-wrap scroll">
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th style={{width:90}}>ID</th>
+                <th>Title</th>
+                <th style={{width:120}}>Agent</th>
+                <th style={{width:140}}>Started <span className="sort">▼</span></th>
+                <th style={{width:90}}>Duration</th>
+                <th className="num" style={{width:80}}>Cost</th>
+                <th className="num" style={{width:140}}>Tokens (in/out)</th>
+                <th style={{width:90}}>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(m => (
+                <tr key={m.id} className={sel===m.id?"on":""} onClick={()=>setSel(m.id)}>
+                  <td><span className="id">{m.id}</span></td>
+                  <td><span className="title">{m.title}</span><div style={{color:"var(--text-faint)",fontSize:10.5,marginTop:2,fontFamily:"'JetBrains Mono',monospace"}}>{m.domain}</div></td>
+                  <td>
+                    <span className="ag">
+                      <span className="g">{AGENTS[m.agent].glyph}</span>
+                      <span className="nm">{m.agent}</span>
+                    </span>
+                  </td>
+                  <td className="mono" style={{fontSize:11.5,color:"var(--text-dim)"}}>{m.start}</td>
+                  <td className="mono" style={{fontSize:11.5}}>{m.duration}</td>
+                  <td className="num">${m.cost.toFixed(2)}</td>
+                  <td className="num">
+                    <span className="pill-num">{(m.tin/1000).toFixed(1)}k<span className="sub">/{(m.tout/1000).toFixed(1)}k</span></span>
+                  </td>
+                  <td><Status s={m.status} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {mission && (
+          <aside className="detail">
+            <div className="detail-hd">
+              <div className="top">
+                <span className="id">{mission.id}</span>
+                <Status s={mission.status} />
+                <button className="close" onClick={()=>setSel(null)}><Icon k="x" /></button>
+              </div>
+              <h2>{mission.title}</h2>
+              <div className="detail-meta">
+                <span><b style={{fontFamily:"'JetBrains Mono',monospace"}}>{mission.agent}</b> · {mission.domain}</span>
+                <span className="mono">started {mission.start}</span>
+                <span className="mono">duration {mission.duration}</span>
+              </div>
+            </div>
+            <div className="detail-stats">
+              <div className="ds"><span className="k">cost</span><span className="v">${mission.cost.toFixed(2)}</span></div>
+              <div className="ds"><span className="k">tokens in</span><span className="v">{(mission.tin/1000).toFixed(1)}k</span></div>
+              <div className="ds"><span className="k">tokens out</span><span className="v">{(mission.tout/1000).toFixed(1)}k</span></div>
+              <div className="ds"><span className="k">events</span><span className="v">{detail.events.length}</span></div>
+            </div>
+            <div className="detail-tabs">
+              <div className={"t"+(tab==="timeline"?" on":"")} onClick={()=>setTab("timeline")}>
+                <Icon k="tl" size={12}/>Timeline <span className="ct">{detail.events.length}</span>
+              </div>
+              <div className={"t"+(tab==="output"?" on":"")} onClick={()=>setTab("output")}>
+                <Icon k="doc" size={12}/>Output
+              </div>
+              <div className={"t"+(tab==="logs"?" on":"")} onClick={()=>setTab("logs")}>
+                <Icon k="logs" size={12}/>Logs <span className="ct">raw</span>
+              </div>
+            </div>
+            <div className="detail-body scroll">
+              {tab === "timeline" && (
+                <div className="tl">
+                  {detail.events.map((ev,i) => (
+                    <div key={i} className={"tl-ev "+ev.k}>
+                      <div className="node"></div>
+                      <div className="tl-meta">
+                        <div className="top">
+                          <span className="ty">{ev.ty}</span>
+                          <span className="ts">{ev.ts}</span>
+                        </div>
+                        <div className="ds" dangerouslySetInnerHTML={{__html: ev.body}}></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {tab === "output" && <div className="output-md" dangerouslySetInnerHTML={{__html: detail.output}}></div>}
+              {tab === "logs"   && <div className="logs" dangerouslySetInnerHTML={{__html: detail.logs}}></div>}
+            </div>
+          </aside>
+        )}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
