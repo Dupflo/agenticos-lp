@@ -30,11 +30,14 @@ export default function Home() {
       <main className="relative z-10 flex w-full min-w-0 flex-1 flex-col items-center px-4 py-14 sm:py-20">
         <div className="w-full max-w-xl text-center">
           <p className="mb-3 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-os-text-faint">
-            Tu arrives depuis TikTok
+            OS Agentic Mike Codeur X FloDev
           </p>
-          <h1 className="text-balance text-3xl font-semibold tracking-tight text-os-text sm:text-4xl">
-            Débloque ton <span className="text-os-accent">Claude Design</span>{" "}
-            et développe ton OS Agentic
+          <h1 className="text-balance text-3xl font-semibold leading-snug tracking-tight text-os-text sm:text-4xl">
+            Débloque les{" "}
+            <span className="text-os-accent">prompts orange</span>
+            {" — "}et développe enfin ton{" "}
+            <span className="text-os-text">OS Agentic</span>, sans tourner en
+            rond.
           </h1>
         </div>
 

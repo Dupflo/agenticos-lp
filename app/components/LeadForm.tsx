@@ -1,16 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  type KitId,
+  DOWNLOAD_KIT_ORDER,
+  KITS,
+  downloadAllKits,
+  triggerDownload,
+} from "../lib/download-kits";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-export const KIT_ZIP = "/downloads/agentic-os-claude-design.zip";
-export const KIT_FILENAME = "agentic-os-claude-design.zip";
 
 type LeadFormProps = {
+  kitId: KitId;
   onSuccess?: () => void;
 };
 
-export function LeadForm({ onSuccess }: LeadFormProps) {
+export function LeadForm({ kitId, onSuccess }: LeadFormProps) {
+  const kit = KITS[kitId];
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "error" | "success">(
     "idle",
@@ -54,34 +61,61 @@ export function LeadForm({ onSuccess }: LeadFormProps) {
   useEffect(() => {
     if (status !== "success") return;
     const id = window.setTimeout(() => {
-      const a = document.createElement("a");
-      a.href = KIT_ZIP;
-      a.download = KIT_FILENAME;
-      a.rel = "noopener";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      if (kitId === "all") {
+        downloadAllKits();
+      } else {
+        triggerDownload(kit.href, kit.filename);
+      }
     }, 400);
     return () => window.clearTimeout(id);
-  }, [status]);
+  }, [status, kitId, kit.href, kit.filename]);
 
   if (status === "success") {
     return (
       <div className="flex flex-col gap-4 text-left">
         <p className="text-[15px] font-semibold text-os-text">Merci !</p>
-        <p className="text-[12.5px] leading-relaxed text-os-text-dim">
-          Ton inscription est bien enregistrée. Le téléchargement de{" "}
-          <span className="font-mono text-[11.5px] text-os-text">{KIT_FILENAME}</span>{" "}
-          devrait démarrer tout seul. Si rien ne se passe, clique sur le bouton
-          ci-dessous.
-        </p>
-        <a
-          href={KIT_ZIP}
-          download={KIT_FILENAME}
-          className="inline-flex h-9 items-center justify-center rounded-[7px] border border-os-line-strong bg-os-elev-2 px-4 text-[12.5px] font-medium text-os-text transition-colors hover:border-os-accent-line hover:text-os-accent"
-        >
-          Télécharger le kit
-        </a>
+        {kitId === "all" ? (
+          <>
+            <p className="text-[12.5px] leading-relaxed text-os-text-dim">
+              Ton inscription est bien enregistrée. Les trois téléchargements
+              devraient démarrer l’un après l’autre. Si un fichier ne part pas,
+              clique sur le lien correspondant.
+            </p>
+            <div className="flex flex-col gap-2">
+              {DOWNLOAD_KIT_ORDER.map((id) => {
+                const k = KITS[id];
+                return (
+                  <a
+                    key={id}
+                    href={k.href}
+                    download={k.filename}
+                    className="inline-flex h-9 items-center justify-center rounded-[7px] border border-os-line-strong bg-os-elev-2 px-4 text-[12.5px] font-medium text-os-text transition-colors hover:border-os-accent-line hover:text-os-accent"
+                  >
+                    {k.downloadCta}
+                  </a>
+                );
+              })}
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="text-[12.5px] leading-relaxed text-os-text-dim">
+              Ton inscription est bien enregistrée. Le téléchargement de{" "}
+              <span className="font-mono text-[11.5px] text-os-text">
+                {kit.filename}
+              </span>{" "}
+              devrait démarrer tout seul. Si rien ne se passe, clique sur le bouton
+              ci-dessous.
+            </p>
+            <a
+              href={kit.href}
+              download={kit.filename}
+              className="inline-flex h-9 items-center justify-center rounded-[7px] border border-os-line-strong bg-os-elev-2 px-4 text-[12.5px] font-medium text-os-text transition-colors hover:border-os-accent-line hover:text-os-accent"
+            >
+              {kit.downloadCta}
+            </a>
+          </>
+        )}
       </div>
     );
   }
@@ -129,7 +163,7 @@ export function LeadForm({ onSuccess }: LeadFormProps) {
         disabled={status === "loading"}
         className="inline-flex h-9 items-center justify-center gap-2 rounded-[7px] border border-transparent bg-os-accent px-4 text-[12.5px] font-medium text-[#1a0e09] transition-colors hover:bg-os-accent-hover disabled:cursor-not-allowed disabled:opacity-70"
       >
-        {status === "loading" ? "Envoi en cours…" : "Reçois ton Claude Design"}
+        {status === "loading" ? "Envoi en cours…" : kit.submitCta}
       </button>
     </form>
   );
